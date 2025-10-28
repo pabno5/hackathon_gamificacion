@@ -1,0 +1,57 @@
+# Dependencias
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE/editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Archivos de compilación/build
+dist/
+build/
+*.log
+
+# Archivos de cobertura
+coverage/
+
+# Archivos temporales
+*.tmp
+*.temp
+.cache/
+
+# Supabase
+.supabase/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Otros
+.next/
+out/
+.vercel/
