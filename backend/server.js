@@ -14,6 +14,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// Personas routes
+const personasRouter = require('./routes/personas');
+app.use('/api/personas', personasRouter);
 
 app.get('/', (req, res) => {
   res.send('¡Servidor funcionando correctamente!');
