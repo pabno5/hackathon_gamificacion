@@ -162,6 +162,28 @@ PUT    /api/citas/:id        Actualizar cita
 DELETE /api/citas/:id        Cancelar cita
 ```
 
+### Especialidades (Requieren Auth)
+
+```
+POST   /api/especialidades   Crear especialidad (Admin/Empleado)
+GET    /api/especialidades   Listar especialidades
+GET    /api/especialidades/:id  Obtener especialidad con sus médicos
+PUT    /api/especialidades/:id  Actualizar especialidad (Admin/Empleado)
+DELETE /api/especialidades/:id  Eliminar especialidad (Admin/Empleado)
+```
+
+### Documentos (Requieren Auth)
+
+```
+POST   /api/documentos       Crear documento (Admin/Empleado)
+GET    /api/documentos       Listar documentos (con filtros)
+GET    /api/documentos/:id   Obtener documento
+GET    /api/documentos/persona/:id  Obtener todos los docs de una persona
+GET    /api/documentos/tipos Obtener tipos de documentos disponibles
+PUT    /api/documentos/:id   Actualizar documento (Admin/Empleado)
+DELETE /api/documentos/:id   Eliminar documento (Admin/Empleado)
+```
+
 ### Roles (Solo Admin)
 
 ```

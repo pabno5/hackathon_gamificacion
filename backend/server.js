@@ -11,6 +11,8 @@ const personasRoutes = require('./routes/personasRoutes');
 const medicosRoutes = require('./routes/medicosRoutes');
 const rolesRoutes = require('./routes/rolesRoutes');
 const credencialesRoutes = require('./routes/credencialesRoutes');
+const especialidadesRoutes = require('./routes/especialidadesRoutes');
+const documentosRoutes = require('./routes/documentosRoutes');
 
 dotenv.config();
 const app = express();
@@ -81,6 +83,12 @@ app.use('/api/roles', rolesRoutes);
 
 // Rutas de credenciales (autenticación)
 app.use('/api/credenciales', credencialesRoutes);
+
+// Rutas de especialidades
+app.use('/api/especialidades', especialidadesRoutes);
+
+// Rutas de documentos
+app.use('/api/documentos', documentosRoutes);
 
 // Rutas de citas
 const citasRoutes = require('./routes/citas');
