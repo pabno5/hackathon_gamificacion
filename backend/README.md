@@ -1,14 +1,20 @@
-# 🔥 Sistema de Autenticación con Firebase
+# Backend - Sistema de Gestión Médica
 
-## 📋 Descripción
+Sistema backend construido con **Supabase PostgreSQL** para datos y **Firebase Authentication** para autenticación.
 
-Sistema completo de autenticación backend implementado con:
-- ✅ **Firebase Authentication** - Gestión de usuarios y autenticación
-- ✅ **Firebase Admin SDK** - Verificación de tokens y custom claims
-- ✅ **Supabase** - Almacenamiento de datos adicionales (roles, perfiles)
-- ✅ **Express.js** - API REST
-- ✅ **Cookies HTTP-only** - Gestión segura de sesiones
-- ✅ **Control de Roles** - Administrador y Empleado
+## 🛠️ Stack Tecnológico
+
+- **Node.js** + **Express.js** - Framework del servidor
+- **Supabase** - Base de datos PostgreSQL managed
+- **Firebase Authentication** - Autenticación y autorización con JWT
+- **bcryptjs** - Hash de contraseñas
+- **pg** - Cliente PostgreSQL para Node.js
+
+## 📋 Requisitos Previos
+
+- Node.js 16 o superior
+- Cuenta en [Supabase](https://supabase.com/)
+- Cuenta en [Firebase](https://firebase.google.com/)
 
 ## 🚀 Inicio Rápido
 
@@ -18,231 +24,274 @@ Sistema completo de autenticación backend implementado con:
 npm install
 ```
 
-### 2. Configurar Firebase
+### 2. Configurar Supabase
 
-Sigue la guía completa: **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)**
+Sigue las instrucciones en `SUPABASE_SETUP.txt`
 
-Resumen:
-1. Crea un proyecto en [Firebase Console](https://console.firebase.google.com/)
-2. Habilita Authentication (Email/Password)
-3. Descarga las credenciales (service account)
-4. Configura las variables de entorno
+### 3. Configurar Firebase
 
-### 3. Configurar variables de entorno
+1. Ve a [Firebase Console](https://console.firebase.google.com/)
+2. Crea un proyecto
+3. Ve a Project Settings > Service Accounts
+4. Genera una nueva clave privada
+5. Guarda el archivo JSON como `config/serviceAccountKey.json`
 
-```bash
-cp env.config.example .env
-```
+### 4. Configurar variables de entorno
 
-Edita el archivo `.env` con tus credenciales reales.
-
-### 4. Configurar base de datos
-
-Ejecuta el script SQL en Supabase:
-```sql
--- Ejecuta el contenido de database_setup.sql en el SQL Editor de Supabase
-```
-
-### 5. Iniciar el servidor
+Copia `.env.example` a `.env` y completa con tus credenciales:
 
 ```bash
+cp .env.example .env
+```
+
+Edita el archivo `.env`:
+
+```env
+# Supabase (desde Dashboard > Settings > Database)
+DATABASE_URL=postgresql://postgres.[REF]:[PASS]@db.[REF].supabase.co:5432/postgres
+
+# Firebase
+FIREBASE_SERVICE_ACCOUNT_PATH=./config/serviceAccountKey.json
+
+# Servidor
+PORT=3000
+NODE_ENV=development
+```
+
+### 5. Ejecutar schema SQL en Supabase
+
+1. Ve a Supabase Dashboard > SQL Editor
+2. Ejecuta el contenido de `config/schema.sql`
+3. Ejecuta el contenido de `config/init_data.sql`
+
+### 6. Iniciar servidor
+
+```bash
+# Desarrollo (con hot-reload)
+npm run dev
+
+# Producción
 npm start
 ```
 
-Deberías ver:
-```
-✅ Firebase Admin inicializado correctamente
-✅ Firebase Client inicializado correctamente
-Servidor corriendo en http://localhost:3000
-```
+### 7. Verificar conexión
 
-## 📚 Documentación
-
-| Documento | Descripción |
-|-----------|-------------|
-| **[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)** | 🔧 Guía completa de configuración de Firebase |
-| **[API_DOCUMENTATION_FIREBASE.md](./API_DOCUMENTATION_FIREBASE.md)** | 📡 Documentación completa de la API |
-| **[ESTRUCTURA_SISTEMA.md](./ESTRUCTURA_SISTEMA.md)** | 🏗️ Arquitectura del proyecto |
-| **[CHECKLIST_INSTALACION.md](./CHECKLIST_INSTALACION.md)** | ✅ Lista de verificación paso a paso |
+Visita: `http://localhost:3000/test-connection`
 
 ## 📁 Estructura del Proyecto
 
 ```
 backend/
 ├── config/
-│   └── firebase.js              # Configuración de Firebase
+│   ├── dataconnect.js       # Conexión a Supabase PostgreSQL
+│   ├── firebase.js          # Firebase Admin SDK
+│   ├── schema.sql           # DDL de la base de datos
+│   └── init_data.sql        # Datos iniciales
+│
 ├── controller/
-│   ├── authController.js        # Registro, login, perfil
-│   ├── adminController.js       # Gestión de usuarios (admin)
-│   └── employeeController.js    # Dashboard (admin/empleado)
+│   ├── authController.js    # Registro, Login, Profile
+│   ├── personasController.js
+│   ├── medicosController.js
+│   ├── rolesController.js
+│   ├── credencialesController.js
+│   └── adminController.js
+│
 ├── routes/
-│   ├── authRoutes.js           # Rutas de autenticación
-│   ├── adminRoutes.js          # Rutas de administrador
-│   └── employeeRoutes.js       # Rutas de empleado
+│   ├── authRoutes.js
+│   ├── personasRoutes.js
+│   ├── medicosRoutes.js
+│   ├── rolesRoutes.js
+│   ├── credencialesRoutes.js
+│   ├── citas.js
+│   └── adminRoutes.js
+│
 ├── utils/
-│   └── authMiddleware.js       # Middleware de autenticación
-├── db.js                        # Configuración de Supabase
-├── server.js                    # Configuración de Express
-├── index.js                     # Punto de entrada
-└── package.json                 # Dependencias
+│   └── authMiddleware.js    # Verificación de tokens y roles
+│
+├── server.js                # Servidor principal
+├── package.json
+└── .env.example
 ```
 
-## 🛣️ Endpoints Principales
+## 🔌 API Endpoints
 
-### Públicos (Sin autenticación)
-- `POST /api/auth/register` - Registrar usuario
-- `POST /api/auth/login` - Iniciar sesión
-
-### Protegidos (Requieren autenticación)
-- `GET /api/auth/profile` - Obtener perfil
-- `POST /api/auth/logout` - Cerrar sesión
-
-### Empleado (Admin/Empleado)
-- `GET /api/employee/dashboard` - Dashboard
-- `GET /api/employee/users-list` - Lista de usuarios
-
-### Administrador (Solo Admin)
-- `GET /api/admin/users` - Todos los usuarios
-- `DELETE /api/admin/users/:id` - Eliminar usuario
-- `PUT /api/admin/users/:id/role` - Cambiar rol
-
-## 🔐 Seguridad
-
-### Firebase Authentication
-- Tokens firmados y verificados por Firebase
-- Custom claims para roles (administrador/empleado)
-- Gestión segura de contraseñas
-- Expiración automática de tokens
-
-### Cookies
-- **httpOnly**: No accesibles desde JavaScript
-- **secure**: Solo HTTPS en producción
-- **sameSite**: Protección contra CSRF
-- **maxAge**: 1 hora de duración
-
-### Middleware
-- `verifyToken`: Verifica autenticación
-- `verifyAdmin`: Verifica rol de administrador
-- `verifyAdminOrEmployee`: Verifica rol admin o empleado
-
-## 🔄 Flujo de Autenticación
+### Autenticación (Públicos)
 
 ```
-Frontend                    Backend                    Firebase
-   │                           │                           │
-   │──signIn(email, pass)──────│                           │
-   │                           │                           │
-   │                           │──────verifyToken()────────▶
-   │                           │                           │
-   │                           │◀─────idToken──────────────│
-   │                           │                           │
-   │◀─POST /api/auth/login─────│                           │
-   │  { idToken }              │                           │
-   │                           │                           │
-   │                           │──verifyIdToken()──────────▶
-   │                           │                           │
-   │                           │◀─decodedToken (uid,rol)───│
-   │                           │                           │
-   │                           │──查询 Supabase────────────▶
-   │                           │                           │
-   │◀──Set-Cookie: authToken───│                           │
-   │                           │                           │
-   │──GET /api/admin/users─────▶                           │
-   │  Cookie: authToken        │                           │
-   │                           │                           │
-   │                           │──verifyIdToken()──────────▶
-   │                           │                           │
-   │                           │◀─verified✓────────────────│
-   │                           │                           │
-   │◀────response JSON─────────│                           │
+POST   /api/auth/register    Registrar nuevo usuario
+POST   /api/auth/login       Iniciar sesión
 ```
 
-## 📦 Dependencias
+### Usuarios (Requieren Auth)
 
-```json
-{
-  "firebase": "^10.7.1",           // Firebase Client SDK
-  "firebase-admin": "^12.0.0",     // Firebase Admin SDK
-  "@supabase/supabase-js": "^2.76.1",
-  "express": "^5.1.0",
-  "cookie-parser": "^1.4.7",
-  "dotenv": "^17.2.3"
-}
+```
+GET    /api/auth/profile     Obtener perfil
+POST   /api/auth/logout      Cerrar sesión
 ```
 
-## 🧪 Probar la API
+### Personas (Requieren Auth)
 
-### Registrar un administrador (desde el backend)
+```
+POST   /api/personas         Crear persona
+GET    /api/personas         Listar personas
+GET    /api/personas/:id     Obtener persona por ID
+PUT    /api/personas/:id     Actualizar persona
+DELETE /api/personas/:id     Eliminar persona
+GET    /api/personas/documento/:numero  Buscar por documento
+```
+
+### Médicos (Requieren Auth)
+
+```
+POST   /api/medicos          Crear médico
+GET    /api/medicos          Listar médicos
+GET    /api/medicos/:id      Obtener médico
+PUT    /api/medicos/:id      Actualizar médico
+DELETE /api/medicos/:id      Eliminar médico
+POST   /api/medicos/:id/especialidades       Asignar especialidad
+DELETE /api/medicos/:id/especialidades/:id_esp  Remover especialidad
+```
+
+### Citas (Requieren Auth)
+
+```
+POST   /api/citas            Crear cita
+GET    /api/citas            Listar citas (con filtros)
+GET    /api/citas/:id        Obtener cita
+PUT    /api/citas/:id        Actualizar cita
+DELETE /api/citas/:id        Cancelar cita
+```
+
+### Roles (Solo Admin)
+
+```
+POST   /api/roles            Crear rol
+GET    /api/roles            Listar roles
+GET    /api/roles/:id        Obtener rol
+PUT    /api/roles/:id        Actualizar rol
+DELETE /api/roles/:id        Eliminar rol
+```
+
+### Administración (Solo Admin)
+
+```
+GET    /api/admin/users      Listar usuarios
+DELETE /api/admin/users/:uid Eliminar usuario
+PUT    /api/admin/users/:uid/role  Cambiar rol
+```
+
+## 🔐 Autenticación y Autorización
+
+El sistema usa un enfoque híbrido:
+
+1. **Firebase Auth** - Gestiona tokens JWT
+2. **Supabase** - Almacena credenciales y datos
+
+### Ejemplo de Request con Auth
+
+```javascript
+// Con Cookie (se establece automáticamente en login)
+fetch('http://localhost:3000/api/personas', {
+  credentials: 'include'
+})
+
+// Con Header
+fetch('http://localhost:3000/api/personas', {
+  headers: {
+    'Authorization': 'Bearer <token>'
+  }
+})
+```
+
+## 📚 Documentación Adicional
+
+- `SUPABASE_SETUP.txt` - Configuración completa de Supabase
+- `EJEMPLO_REGISTRO_LOGIN.txt` - Ejemplos de uso de la API
+- `ARQUITECTURA_FINAL.txt` - Diagrama de arquitectura
+- `RESUMEN_CAMBIOS.txt` - Historial de cambios
+
+## 🧪 Testing
 
 ```bash
+# Probar conexión
+curl http://localhost:3000/test-connection
+
+# Registrar usuario
 curl -X POST http://localhost:3000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@ejemplo.com",
-    "password": "admin123",
-    "nombre": "Administrador",
-    "rol": "administrador"
+    "tipo_documento": "CC",
+    "numero_documento": "123456",
+    "nombres": "Juan",
+    "apellidos": "Pérez",
+    "correo": "juan@email.com",
+    "usuario": "juanperez",
+    "contrasena": "Pass123!",
+    "rol_nombre": "paciente"
+  }'
+
+# Login
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "usuario": "juanperez",
+    "contrasena": "Pass123!"
   }'
 ```
 
-### Login (requiere Firebase Client en frontend)
+## 🔧 Solución de Problemas
 
-Ver ejemplos completos en: **[API_DOCUMENTATION_FIREBASE.md](./API_DOCUMENTATION_FIREBASE.md)**
+### Error: "password authentication failed"
+→ Verifica tus credenciales de Supabase en `.env`
 
-## ⚙️ Variables de Entorno
+### Error: "Firebase Admin no inicializado"
+→ Verifica que `serviceAccountKey.json` exista en `config/`
 
-| Variable | Descripción | Requerida |
-|----------|-------------|-----------|
-| `PORT` | Puerto del servidor | No (default: 3000) |
-| `NODE_ENV` | Entorno (development/production) | No |
-| `SUPABASE_URL` | URL de tu proyecto Supabase | Sí |
-| `SUPABASE_KEY` | Clave anónima de Supabase | Sí |
-| `FIREBASE_API_KEY` | API Key de Firebase | Sí |
-| `FIREBASE_AUTH_DOMAIN` | Auth domain de Firebase | Sí |
-| `FIREBASE_PROJECT_ID` | ID del proyecto Firebase | Sí |
-| `FIREBASE_STORAGE_BUCKET` | Storage bucket de Firebase | Sí |
-| `FIREBASE_MESSAGING_SENDER_ID` | Messaging sender ID | Sí |
-| `FIREBASE_APP_ID` | App ID de Firebase | Sí |
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | Ruta al archivo de credenciales | Sí (una de las dos) |
-| `FIREBASE_SERVICE_ACCOUNT` | JSON de credenciales como string | Sí (una de las dos) |
+### Error: "relation does not exist"
+→ Ejecuta `schema.sql` en Supabase SQL Editor
 
-## 🆘 Solución de Problemas
+### Error: "connect ETIMEDOUT"
+→ Verifica tu conexión a internet y que DATABASE_URL sea correcta
 
-### Firebase Admin no se inicializa
-✓ Verifica que el archivo de credenciales exista en la ruta especificada  
-✓ Revisa que `FIREBASE_SERVICE_ACCOUNT_PATH` esté correcto  
-✓ Asegúrate de que el JSON sea válido
+## 📦 Deployment
 
-### Error: "Token inválido"
-✓ El token de Firebase expira cada hora, obtén uno nuevo  
-✓ Verifica que estés enviando el token en cookies o header Authorization
+### Variables de entorno en producción
 
-### Error: "Usuario no encontrado en la base de datos"
-✓ Verifica que el usuario esté registrado en Supabase  
-✓ Revisa la tabla `usuarios` y que tenga el campo `firebase_uid`
+Asegúrate de configurar estas variables en tu plataforma de hosting:
 
-### No puedo acceder a rutas de administrador
-✓ Verifica que el usuario tenga rol "administrador" en la BD  
-✓ Los custom claims se actualizan en el próximo login
+```env
+DATABASE_URL=postgresql://...
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
+PORT=3000
+NODE_ENV=production
+```
 
-## 🎯 Próximos Pasos
+### Plataformas recomendadas
 
-1. ✅ Configura Firebase Console
-2. ✅ Instala dependencias
-3. ✅ Configura variables de entorno
-4. ✅ Ejecuta script SQL
-5. ✅ Inicia el servidor
-6. 📝 Implementa el frontend con Firebase Client SDK
-7. 📝 Integra las rutas de la API en tu aplicación
+- **Vercel** - Para el backend
+- **Railway** - Para backend con PostgreSQL
+- **Render** - Para backend con PostgreSQL
+- **Fly.io** - Para backend con PostgreSQL
 
-## 📞 Soporte
+## 🤝 Contribución
 
-Para más información, revisa la documentación:
-- [Firebase Docs](https://firebase.google.com/docs)
-- [Supabase Docs](https://supabase.com/docs)
-- [Express Docs](https://expressjs.com/)
+1. Fork el proyecto
+2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit cambios (`git commit -am 'Agrega nueva funcionalidad'`)
+4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Crea un Pull Request
 
 ## 📄 Licencia
 
 ISC
 
+## 👥 Autores
+
+Equipo de Hackathon Gamificación
+
+## 🆘 Soporte
+
+Si tienes problemas, revisa:
+1. `SUPABASE_SETUP.txt` para configuración
+2. `EJEMPLO_REGISTRO_LOGIN.txt` para ejemplos
+3. Crea un issue en el repositorio

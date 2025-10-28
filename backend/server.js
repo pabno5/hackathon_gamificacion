@@ -7,7 +7,10 @@ const path = require('path');
 // Importar rutas
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const employeeRoutes = require('./routes/employeeRoutes');
+const personasRoutes = require('./routes/personasRoutes');
+const medicosRoutes = require('./routes/medicosRoutes');
+const rolesRoutes = require('./routes/rolesRoutes');
+const credencialesRoutes = require('./routes/credencialesRoutes');
 
 dotenv.config();
 const app = express();
@@ -16,33 +19,37 @@ const PORT = process.env.PORT || 3000;
 // Middlewares
 app.use(bodyParser.json()); // Para parsear JSON
 app.use(bodyParser.urlencoded({ extended: true }));
-// Parse JSON bodies
-app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-
-// Personas routes
-const personasRouter = require('./routes/personas');
-app.use('/api/personas', personasRouter);
 
 // Rutas
 app.get('/', (req, res) => {
-  res.send('¡Servidor funcionando correctamente con Firebase!');
+  res.send('¡Servidor funcionando correctamente con Supabase + Firebase Auth!');
 });
 
 // Ruta de prueba para verificar la conexión
 app.get('/test-connection', async (req, res) => {
   try {
-    const { admin } = require('./config/firebase');
-    
+    const { query, admin } = require('./config/dataconnect');
+
+    // Verificar conexión a PostgreSQL
+    const result = await query('SELECT NOW() as now, version() as version');
+    const dbTime = result.rows[0];
+
     // Verificar que Firebase Admin esté inicializado
-    const app = admin.app();
-    
+    const firebaseApp = admin.app();
+
     res.json({
       success: true,
-      status: 'Conectado a Firebase',
-      projectId: app.options.projectId || 'Firebase inicializado',
+      database: {
+        status: 'Conectado a Supabase PostgreSQL',
+        serverTime: dbTime.now,
+        version: dbTime.version
+      },
+      firebase: {
+        status: 'Firebase Auth inicializado',
+        projectId: firebaseApp.options.projectId
+      },
       message: '¡Conexión establecida exitosamente!'
     });
   } catch (error) {
@@ -63,15 +70,27 @@ app.use('/api/auth', authRoutes);
 // Rutas de administrador (requieren rol de administrador)
 app.use('/api/admin', adminRoutes);
 
-// Rutas de empleado (requieren rol de administrador o empleado)
-app.use('/api/employee', employeeRoutes);
-// Citas routes
-try {
-  const citasRouter = require('./routes/citas');
-  app.use('/api/citas', citasRouter);
-} catch (err) {
-  // If routes file doesn't exist yet, skip — it'll be added by the CRUD implementation.
-  console.warn('Citas router not mounted yet:', err.message);
-}
+// Rutas de personas
+app.use('/api/personas', personasRoutes);
+
+// Rutas de médicos
+app.use('/api/medicos', medicosRoutes);
+
+// Rutas de roles
+app.use('/api/roles', rolesRoutes);
+
+// Rutas de credenciales (autenticación)
+app.use('/api/credenciales', credencialesRoutes);
+
+// Rutas de citas
+const citasRoutes = require('./routes/citas');
+app.use('/api/citas', citasRoutes);
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`🔧 Modo: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Test conexión: http://localhost:${PORT}/test-connection`);
+});
 
 module.exports = app;
