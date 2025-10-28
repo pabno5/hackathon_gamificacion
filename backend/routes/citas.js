@@ -4,7 +4,7 @@ const { query, admin } = require('../config/dataconnect');
 const { verifyToken } = require('../utils/authMiddleware');
 
 // Proteger todas las rutas de citas con autenticación de Firebase
-router.use(verifyToken);
+/* router.use(verifyToken); */
 
 // Helper para manejar errores
 const handleError = (res, error, message = 'Error en la operación') => {
@@ -149,6 +149,37 @@ router.get('/', async (req, res) => {
     return handleError(res, err, 'Error al listar citas');
   }
 });
+// Obtener resumen de citas (fecha, paciente, médico)
+router.get('/resumen', async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT 
+        c.id_cita,
+        c.fecha_cita,
+        CONCAT(pp.nombres, ' ', pp.apellidos) AS nombre_paciente,
+        CONCAT(pm.nombres, ' ', pm.apellidos) AS nombre_medico
+      FROM citas c
+      JOIN personas pp ON c.id_paciente = pp.id_persona
+      JOIN medicos m ON c.id_medico = m.id_medico
+      JOIN personas pm ON m.id_persona = pm.id_persona
+      ORDER BY c.fecha_cita ASC
+    `);
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error al obtener resumen de citas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener resumen de citas',
+      error: error.message
+    });
+  }
+});
+
 
 // Get single cita
 router.get('/:id', async (req, res) => {
@@ -292,5 +323,7 @@ router.delete('/:id', async (req, res) => {
     return handleError(res, err, 'Error al eliminar cita');
   }
 });
+
+
 
 module.exports = router;
