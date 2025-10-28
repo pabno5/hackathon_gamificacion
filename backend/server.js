@@ -3,7 +3,6 @@ const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const { supabase } = require('./db');
 
 // Importar rutas
 const authRoutes = require('./routes/authRoutes');
@@ -24,19 +23,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Rutas
 app.get('/', (req, res) => {
-  res.send('¡Servidor funcionando correctamente!');
+  res.send('¡Servidor funcionando correctamente con Firebase!');
 });
 
 // Ruta de prueba para verificar la conexión
 app.get('/test-connection', async (req, res) => {
   try {
-    // Probar conexión con Supabase
-    const { data: version } = await supabase.rpc('version');
+    const { admin } = require('./config/firebase');
+    
+    // Verificar que Firebase Admin esté inicializado
+    const app = admin.app();
     
     res.json({
       success: true,
-      status: 'Conectado a Supabase',
-      url: process.env.SUPABASE_URL,
+      status: 'Conectado a Firebase',
+      projectId: app.options.projectId || 'Firebase inicializado',
       message: '¡Conexión establecida exitosamente!'
     });
   } catch (error) {

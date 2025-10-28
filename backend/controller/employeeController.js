@@ -1,16 +1,14 @@
-const { supabase } = require('../db');
+const { admin } = require('../config/firebase');
+
+// Obtener referencia a Firestore
+const db = admin.firestore();
 
 // Obtener datos del dashboard (administradores y empleados)
 const getDashboardData = async (req, res) => {
   try {
     // Obtener estadísticas básicas
-    const { count: userCount, error: userError } = await supabase
-      .from('usuarios')
-      .select('*', { count: 'exact', head: true });
-
-    if (userError) {
-      throw userError;
-    }
+    const usersSnapshot = await db.collection('usuarios').get();
+    const userCount = usersSnapshot.size;
 
     res.status(200).json({
       success: true,
@@ -37,14 +35,15 @@ const getDashboardData = async (req, res) => {
 // Obtener listado simple de usuarios (administradores y empleados)
 const getUsersList = async (req, res) => {
   try {
-    const { data: users, error } = await supabase
-      .from('usuarios')
-      .select('id, firebase_uid, nombre, email, rol')
-      .order('nombre', { ascending: true });
-
-    if (error) {
-      throw error;
-    }
+    const usersSnapshot = await db.collection('usuarios').orderBy('nombre').get();
+    
+    const users = [];
+    usersSnapshot.forEach(doc => {
+      users.push({
+        uid: doc.id,
+        ...doc.data()
+      });
+    });
 
     res.status(200).json({
       success: true,
@@ -65,6 +64,3 @@ module.exports = {
   getDashboardData,
   getUsersList
 };
-
-
-

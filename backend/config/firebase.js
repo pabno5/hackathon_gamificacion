@@ -1,60 +1,60 @@
 const admin = require('firebase-admin');
-const { initializeApp } = require('firebase/app');
-const { getAuth } = require('firebase/auth');
 require('dotenv').config();
 
-// Configuración de Firebase Admin (para el backend)
+// Configuración de Firebase Admin usando variables de entorno
 let serviceAccount;
 
 try {
-  // Intenta cargar las credenciales desde el archivo JSON
+  // OPCIÓN 1: Cargar desde archivo JSON (desarrollo)
   if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-    serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    // O desde una variable de entorno con el JSON completo
+    const path = require('path');
+    const credentialsPath = path.resolve(__dirname, '..', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    serviceAccount = require(credentialsPath);
+    console.log('📁 Cargando credenciales desde archivo:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+  } 
+  // OPCIÓN 2: Usar variables de entorno individuales (producción)
+  else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    serviceAccount = {
+      type: 'service_account',
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Convertir \n literales a saltos de línea
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      client_id: process.env.FIREBASE_CLIENT_ID,
+      auth_uri: process.env.FIREBASE_AUTH_URI || 'https://accounts.google.com/o/oauth2/auth',
+      token_uri: process.env.FIREBASE_TOKEN_URI || 'https://oauth2.googleapis.com/token',
+      auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL || 'https://www.googleapis.com/oauth2/v1/certs',
+      client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
+    };
+    console.log('🔐 Cargando credenciales desde variables de entorno');
+  } 
+  // OPCIÓN 3: JSON completo como string
+  else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  } else {
-    console.warn('⚠️  No se encontraron credenciales de Firebase Admin. Algunas funciones pueden no estar disponibles.');
+    console.log('📝 Cargando credenciales desde JSON string');
+  } 
+  else {
+    console.warn('⚠️  No se encontraron credenciales de Firebase Admin.');
+    console.warn('⚠️  Configura FIREBASE_SERVICE_ACCOUNT_PATH o las variables de entorno individuales.');
   }
 
   if (serviceAccount) {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+      credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id
     });
     console.log('✅ Firebase Admin inicializado correctamente');
+    console.log('🎯 Project ID:', serviceAccount.project_id);
+  } else {
+    console.error('❌ No se pudo inicializar Firebase Admin - credenciales no encontradas');
   }
 } catch (error) {
   console.error('❌ Error al inicializar Firebase Admin:', error.message);
+  console.error('💡 Verifica tu configuración en el archivo .env');
 }
 
-// Configuración de Firebase Client (para compatibilidad)
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
-};
-
-// Solo inicializar si tenemos la configuración
-let firebaseApp = null;
-let auth = null;
-
-if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-  try {
-    firebaseApp = initializeApp(firebaseConfig);
-    auth = getAuth(firebaseApp);
-    console.log('✅ Firebase Client inicializado correctamente');
-  } catch (error) {
-    console.error('❌ Error al inicializar Firebase Client:', error.message);
-  }
-}
-
-// Exportar tanto admin como client auth
+// Exportar admin
 module.exports = {
-  admin,
-  auth,
-  firebaseApp
+  admin
 };
 

@@ -9,8 +9,8 @@ router.use(verifyAdmin);
 
 // Gestión de usuarios (solo administradores)
 router.get('/users', getAllUsers);
-router.delete('/users/:id', deleteUser);
-router.put('/users/:id/role', updateUserRole);
+router.delete('/users/:uid', deleteUser);
+router.put('/users/:uid/role', updateUserRole);
 
 module.exports = router;
 

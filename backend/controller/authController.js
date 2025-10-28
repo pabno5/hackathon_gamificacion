@@ -1,5 +1,7 @@
 const { admin } = require('../config/firebase');
-const { supabase } = require('../db');
+
+// Obtener referencia a Firestore
+const db = admin.firestore();
 
 // Registrar un nuevo usuario con Firebase
 const register = async (req, res) => {
@@ -35,32 +37,19 @@ const register = async (req, res) => {
       rol: rol
     });
 
-    // Guardar datos adicionales en Supabase
-    const { data: newUser, error } = await supabase
-      .from('usuarios')
-      .insert([
-        {
-          firebase_uid: userRecord.uid,
-          email,
-          nombre,
-          rol
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      // Si falla guardar en Supabase, eliminar usuario de Firebase
-      await admin.auth().deleteUser(userRecord.uid);
-      throw error;
-    }
+    // Guardar datos adicionales en Firestore
+    await db.collection('usuarios').doc(userRecord.uid).set({
+      email,
+      nombre,
+      rol,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     res.status(201).json({
       success: true,
       message: 'Usuario registrado exitosamente',
       user: {
         uid: userRecord.uid,
-        id: newUser.id,
         email: userRecord.email,
         nombre: nombre,
         rol: rol
@@ -107,19 +96,17 @@ const login = async (req, res) => {
     // Obtener información del usuario de Firebase
     const userRecord = await admin.auth().getUser(uid);
 
-    // Obtener datos adicionales de Supabase (incluyendo rol)
-    const { data: userData, error } = await supabase
-      .from('usuarios')
-      .select('*')
-      .eq('firebase_uid', uid)
-      .single();
-
-    if (error || !userData) {
+    // Obtener datos adicionales de Firestore
+    const userDoc = await db.collection('usuarios').doc(uid).get();
+    
+    if (!userDoc.exists) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado en la base de datos'
       });
     }
+
+    const userData = userDoc.data();
 
     // Crear un custom token para mantener la sesión
     const customToken = await admin.auth().createCustomToken(uid, {
@@ -140,7 +127,6 @@ const login = async (req, res) => {
       customToken,
       user: {
         uid: userRecord.uid,
-        id: userData.id,
         email: userRecord.email,
         nombre: userData.nombre,
         rol: userData.rol
@@ -194,25 +180,22 @@ const getProfile = async (req, res) => {
     // Obtener datos de Firebase
     const userRecord = await admin.auth().getUser(uid);
 
-    // Obtener datos de Supabase
-    const { data: userData, error } = await supabase
-      .from('usuarios')
-      .select('id, firebase_uid, email, nombre, rol, created_at')
-      .eq('firebase_uid', uid)
-      .single();
-
-    if (error || !userData) {
+    // Obtener datos de Firestore
+    const userDoc = await db.collection('usuarios').doc(uid).get();
+    
+    if (!userDoc.exists) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
       });
     }
 
+    const userData = userDoc.data();
+
     res.status(200).json({
       success: true,
       user: {
         uid: userRecord.uid,
-        id: userData.id,
         email: userRecord.email,
         nombre: userData.nombre,
         rol: userData.rol,
@@ -236,6 +219,3 @@ module.exports = {
   logout,
   getProfile
 };
-
-
-

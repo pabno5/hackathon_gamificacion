@@ -1,45 +1,68 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../db');
+const { admin } = require('../config/firebase');
+const { verifyToken } = require('../utils/authMiddleware');
 
-// Helpers
-const handleSupabaseError = (res, error) => {
-  console.error('Supabase error:', error);
-  return res.status(500).json({ success: false, error: error.message || error });
+// Obtener referencia a Firestore
+const db = admin.firestore();
+
+// Proteger todas las rutas de citas con autenticación de Firebase
+router.use(verifyToken);
+
+// Helper para manejar errores
+const handleError = (res, error, message = 'Error en la operación') => {
+  console.error(message + ':', error);
+  return res.status(500).json({ 
+    success: false, 
+    error: error.message || message 
+  });
 };
 
-const isUUID = (v) => {
-  if (!v || typeof v !== 'string') return false;
-  const re = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-  return re.test(v);
+// Validar formato de ID de Firestore (puede ser autogenerado o UUID)
+const isValidId = (id) => {
+  return id && typeof id === 'string' && id.length > 0;
 };
 
 // Create a new cita
 router.post('/', async (req, res) => {
   try {
     const { id_paciente, id_medico, fecha_cita, motivo, estado, observaciones } = req.body;
+    
     if (!id_paciente || !id_medico || !fecha_cita) {
-      return res.status(400).json({ success: false, error: 'id_paciente, id_medico y fecha_cita son obligatorios' });
-    }
-    if (!isUUID(id_paciente) || !isUUID(id_medico)) {
-      return res.status(400).json({ success: false, error: 'id_paciente e id_medico deben ser UUID válidos' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'id_paciente, id_medico y fecha_cita son obligatorios' 
+      });
     }
 
     const payload = {
       id_paciente,
       id_medico,
-      fecha_cita,
+      fecha_cita: admin.firestore.Timestamp.fromDate(new Date(fecha_cita)),
       motivo: motivo || null,
       estado: estado || 'pendiente',
-      observaciones: observaciones || null
+      observaciones: observaciones || null,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      created_by: req.user.uid
     };
 
-    const { data, error } = await supabase.from('citas').insert([payload]).select().single();
-    if (error) return handleSupabaseError(res, error);
+    // Crear documento con ID autogenerado
+    const citaRef = await db.collection('citas').add(payload);
+    
+    // Obtener el documento creado
+    const citaDoc = await citaRef.get();
+    const citaData = citaDoc.data();
 
-    return res.status(201).json({ success: true, data });
+    return res.status(201).json({ 
+      success: true, 
+      data: {
+        id: citaDoc.id,
+        ...citaData,
+        fecha_cita: citaData.fecha_cita.toDate().toISOString()
+      }
+    });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return handleError(res, err, 'Error al crear cita');
   }
 });
 
@@ -47,28 +70,57 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { id_paciente, id_medico, estado, from, to, limit, offset } = req.query;
-    let query = supabase.from('citas').select('*');
+    
+    let query = db.collection('citas');
 
+    // Aplicar filtros
     if (id_paciente) {
-      if (!isUUID(id_paciente)) return res.status(400).json({ success: false, error: 'id_paciente debe ser un UUID válido' });
-      query = query.eq('id_paciente', id_paciente);
+      query = query.where('id_paciente', '==', id_paciente);
     }
     if (id_medico) {
-      if (!isUUID(id_medico)) return res.status(400).json({ success: false, error: 'id_medico debe ser un UUID válido' });
-      query = query.eq('id_medico', id_medico);
+      query = query.where('id_medico', '==', id_medico);
     }
-    if (estado) query = query.eq('estado', estado);
-    if (from) query = query.gte('fecha_cita', from);
-    if (to) query = query.lte('fecha_cita', to);
-    if (limit) query = query.limit(parseInt(limit, 10));
-    if (offset) query = query.range(parseInt(offset, 10), parseInt(offset, 10) + (parseInt(limit || '100', 10) - 1));
+    if (estado) {
+      query = query.where('estado', '==', estado);
+    }
+    if (from) {
+      const fromDate = admin.firestore.Timestamp.fromDate(new Date(from));
+      query = query.where('fecha_cita', '>=', fromDate);
+    }
+    if (to) {
+      const toDate = admin.firestore.Timestamp.fromDate(new Date(to));
+      query = query.where('fecha_cita', '<=', toDate);
+    }
 
-    const { data, error } = await query.order('fecha_cita', { ascending: true });
-    if (error) return handleSupabaseError(res, error);
+    // Ordenar por fecha
+    query = query.orderBy('fecha_cita', 'asc');
 
-    return res.json({ success: true, data });
+    // Aplicar límite y offset
+    if (offset) {
+      query = query.offset(parseInt(offset, 10));
+    }
+    if (limit) {
+      query = query.limit(parseInt(limit, 10));
+    } else {
+      query = query.limit(100); // Límite por defecto
+    }
+
+    const snapshot = await query.get();
+    
+    const citas = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      citas.push({
+        id: doc.id,
+        ...data,
+        fecha_cita: data.fecha_cita ? data.fecha_cita.toDate().toISOString() : null,
+        created_at: data.created_at ? data.created_at.toDate().toISOString() : null
+      });
+    });
+
+    return res.json({ success: true, data: citas });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return handleError(res, err, 'Error al listar citas');
   }
 });
 
@@ -76,15 +128,36 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    if (!isUUID(id)) return res.status(400).json({ success: false, error: 'id debe ser un UUID válido' });
-    const { data, error } = await supabase.from('citas').select('*').eq('id_cita', id).single();
-    if (error) {
-      // Supabase may return an error when no rows found; normalize to 404
-      return res.status(404).json({ success: false, error: 'Cita no encontrada' });
+    
+    if (!isValidId(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ID inválido' 
+      });
     }
-    return res.json({ success: true, data });
+
+    const citaDoc = await db.collection('citas').doc(id).get();
+    
+    if (!citaDoc.exists) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Cita no encontrada' 
+      });
+    }
+
+    const data = citaDoc.data();
+    
+    return res.json({ 
+      success: true, 
+      data: {
+        id: citaDoc.id,
+        ...data,
+        fecha_cita: data.fecha_cita ? data.fecha_cita.toDate().toISOString() : null,
+        created_at: data.created_at ? data.created_at.toDate().toISOString() : null
+      }
+    });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return handleError(res, err, 'Error al obtener cita');
   }
 });
 
@@ -92,20 +165,55 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    if (!isUUID(id)) return res.status(400).json({ success: false, error: 'id debe ser un UUID válido' });
-    const updates = req.body;
-    // Prevent changing primary key
-    delete updates.id_cita;
+    
+    if (!isValidId(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ID inválido' 
+      });
+    }
 
-    // If updating foreign keys, validate UUID format
-    if (updates.id_paciente && !isUUID(updates.id_paciente)) return res.status(400).json({ success: false, error: 'id_paciente debe ser UUID válido' });
-    if (updates.id_medico && !isUUID(updates.id_medico)) return res.status(400).json({ success: false, error: 'id_medico debe ser UUID válido' });
+    const updates = { ...req.body };
+    
+    // Agregar timestamp de actualización
+    updates.updated_at = admin.firestore.FieldValue.serverTimestamp();
+    updates.updated_by = req.user.uid;
 
-    const { data, error } = await supabase.from('citas').update(updates).eq('id_cita', id).select().single();
-    if (error) return handleSupabaseError(res, error);
-    return res.json({ success: true, data });
+    // Convertir fecha si existe
+    if (updates.fecha_cita) {
+      updates.fecha_cita = admin.firestore.Timestamp.fromDate(new Date(updates.fecha_cita));
+    }
+
+    // Verificar que la cita existe
+    const citaRef = db.collection('citas').doc(id);
+    const citaDoc = await citaRef.get();
+    
+    if (!citaDoc.exists) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Cita no encontrada' 
+      });
+    }
+
+    // Actualizar documento
+    await citaRef.update(updates);
+    
+    // Obtener documento actualizado
+    const updatedDoc = await citaRef.get();
+    const data = updatedDoc.data();
+
+    return res.json({ 
+      success: true, 
+      data: {
+        id: updatedDoc.id,
+        ...data,
+        fecha_cita: data.fecha_cita ? data.fecha_cita.toDate().toISOString() : null,
+        created_at: data.created_at ? data.created_at.toDate().toISOString() : null,
+        updated_at: data.updated_at ? data.updated_at.toDate().toISOString() : null
+      }
+    });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return handleError(res, err, 'Error al actualizar cita');
   }
 });
 
@@ -113,12 +221,40 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    if (!isUUID(id)) return res.status(400).json({ success: false, error: 'id debe ser un UUID válido' });
-    const { data, error } = await supabase.from('citas').delete().eq('id_cita', id).select().single();
-    if (error) return handleSupabaseError(res, error);
-    return res.json({ success: true, data });
+    
+    if (!isValidId(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ID inválido' 
+      });
+    }
+
+    const citaRef = db.collection('citas').doc(id);
+    const citaDoc = await citaRef.get();
+    
+    if (!citaDoc.exists) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Cita no encontrada' 
+      });
+    }
+
+    const data = citaDoc.data();
+    
+    // Eliminar documento
+    await citaRef.delete();
+
+    return res.json({ 
+      success: true, 
+      data: {
+        id: citaDoc.id,
+        ...data,
+        fecha_cita: data.fecha_cita ? data.fecha_cita.toDate().toISOString() : null
+      },
+      message: 'Cita eliminada exitosamente'
+    });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return handleError(res, err, 'Error al eliminar cita');
   }
 });
 
