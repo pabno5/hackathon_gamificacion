@@ -1,43 +1,28 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const bodyParser = require('body-parser');
-const cookieParser = require('cookie-parser');
-const path = require('path');
-const { supabase } = require('./db');
+// server.js
+const express = require("express");
+const { db } = require("./firebase.config");
 
-dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/', (req, res) => {
-  res.send('¡Servidor funcionando correctamente!');
+// Ruta simple para comprobar el estado del servidor
+app.get("/", (req, res) => {
+  res.send("✅ Servidor funcionando correctamente con Firestore");
 });
 
-// Ruta de prueba para verificar la conexión
-app.get('/test-connection', async (req, res) => {
+// Ruta para probar conexión a Firestore
+app.get("/test-connection", async (req, res) => {
   try {
-    // Probar conexión con Supabase
-    const { data: version } = await supabase.rpc('version');
-    
+    const ref = db.collection("test").doc("connection");
+    await ref.set({ status: "ok", timestamp: new Date() });
+    const doc = await ref.get();
+
     res.json({
       success: true,
-      status: 'Conectado a Supabase',
-      url: process.env.SUPABASE_URL,
-      message: '¡Conexión establecida exitosamente!'
+      message: "Conectado a Firestore",
+      data: doc.data(),
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      details: {
-        name: error.name,
-        code: error.code
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

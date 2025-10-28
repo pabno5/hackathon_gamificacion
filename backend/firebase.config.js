@@ -1,21 +1,15 @@
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js"
-  import { getAuth } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js"
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+// firebase.config.js
+require("dotenv").config();
+const admin = require("firebase-admin");
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyBx1zaLfph2l9-JylJroqs8kYkmegnxHK0",
-    authDomain: "fir-auth-a1d39.firebaseapp.com",
-    projectId: "fir-auth-a1d39",
-    storageBucket: "fir-auth-a1d39.firebasestorage.app",
-    messagingSenderId: "81981986353",
-    appId: "1:81981986353:web:c610b6f98ce73e7c2ae710"
-  };
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  }),
+});
 
-  // Initialize Firebase
-  export const app = initializeApp(firebaseConfig);
-  export const auth = getAuth(app)
-  export const db = getFirestore(app)
+const db = admin.firestore();
+
+module.exports = { db };
