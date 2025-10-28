@@ -27,24 +27,6 @@ CREATE TABLE roles (
 );
 
 -- ==========================================
--- 3. TABLA: Credenciales
--- ==========================================
-CREATE TABLE credenciales (
-    id_credencial UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    id_persona UUID NOT NULL,
-    id_rol UUID,
-    usuario VARCHAR(50) UNIQUE NOT NULL,
-    contrasena_hash VARCHAR(255) NOT NULL,
-    firebase_id VARCHAR(200), -- 🔥 nuevo campo para ID de Firebase
-    activo BOOLEAN DEFAULT TRUE,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_persona) REFERENCES personas (id_persona)
-        ON UPDATE CASCADE ON DELETE CASCADE,
-    FOREIGN KEY (id_rol) REFERENCES roles (id_rol)
-        ON UPDATE CASCADE ON DELETE SET NULL
-);
-
--- ==========================================
 -- 4. TABLA: Médicos
 -- ==========================================
 CREATE TABLE medicos (
