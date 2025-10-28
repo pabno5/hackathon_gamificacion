@@ -10,6 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
+// Parse JSON bodies
+app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -40,5 +42,14 @@ app.get('/test-connection', async (req, res) => {
     });
   }
 });
+
+// Citas routes
+try {
+  const citasRouter = require('./routes/citas');
+  app.use('/api/citas', citasRouter);
+} catch (err) {
+  // If routes file doesn't exist yet, skip — it'll be added by the CRUD implementation.
+  console.warn('Citas router not mounted yet:', err.message);
+}
 
 module.exports = app;
