@@ -17,6 +17,8 @@ const PORT = process.env.PORT || 3000;
 // Middlewares
 app.use(bodyParser.json()); // Para parsear JSON
 app.use(bodyParser.urlencoded({ extended: true }));
+// Parse JSON bodies
+app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -57,5 +59,13 @@ app.use('/api/admin', adminRoutes);
 
 // Rutas de empleado (requieren rol de administrador o empleado)
 app.use('/api/employee', employeeRoutes);
+// Citas routes
+try {
+  const citasRouter = require('./routes/citas');
+  app.use('/api/citas', citasRouter);
+} catch (err) {
+  // If routes file doesn't exist yet, skip — it'll be added by the CRUD implementation.
+  console.warn('Citas router not mounted yet:', err.message);
+}
 
 module.exports = app;
