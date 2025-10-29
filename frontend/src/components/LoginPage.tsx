@@ -4,9 +4,9 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Eye, ArrowLeft, Calendar, TestTube, FlaskConical, Upload, FileText, Check, Mail, Send } from "lucide-react";
 import logoImage from "../assets/logo.png";
-import citasImage from "../assets/citas.png";
-import examenesImage from "../assets/examenes.png";
-import especialistasImage from "../assets/especialista.png";
+import citasImage from "../assets/citas.jpg";
+import examenesImage from "../assets/examenes.jpg";
+import especialistasImage from "../assets/especialista.jpg";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useState, useEffect } from "react";
@@ -157,12 +157,17 @@ export function LoginPage({ onBack }: LoginPageProps) {
     setProgressMessage(message);
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (e) {
-      // noop
-    } finally {
+  const handleBackClick = async () => {
+    // Si estamos en el menú principal, cerrar sesión; si no, solo volver
+    if (currentView === "options") {
+      try {
+        await logout();
+      } catch (e) {
+        // noop
+      } finally {
+        onBack();
+      }
+    } else {
       onBack();
     }
   };
@@ -677,7 +682,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
                       <Button 
                         variant="outline"
                         className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9] hover:text-white rounded-full px-6 transition-colors"
-                        onClick={handleLogout}
+                        onClick={handleBackClick}
                       >
                         Cerrar sesión
                       </Button>

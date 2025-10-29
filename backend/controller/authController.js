@@ -17,7 +17,6 @@ const register = async (req, res) => {
       direccion
     } = req.body;
 
-    console.log(uid);
 
     // Validar campos requeridos
     if (!tipo_documento || !numero_documento || !nombres || !apellidos || !telefono) {
@@ -43,7 +42,7 @@ const register = async (req, res) => {
     // Crear la persona (correo se guarda como NULL)
     const personaResult = await query(
       `INSERT INTO personas (
-        id_persona, tipo_documento, numero_documento, nombres, apellidos,
+        uid, tipo_documento, numero_documento, nombres, apellidos,
         fecha_nacimiento, telefono, direccion
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id_persona, tipo_documento, numero_documento, nombres, apellidos, fecha_nacimiento, telefono, direccion`,
@@ -143,13 +142,29 @@ const getUID = async (req, res) => {
   try {
     const uid = req.user.uid;
 
-    res.status(200).json({
-      success: true,
-      uid: uid
+    const checkUID = await query(
+      'SELECT uid FROM personas WHERE uid = $1',
+      [uid]
+    );
+
+    if (checkUID.rows.length > 0) {
+      return res.status(200).json({
+        code: 200,
+        success: true,
+        message: 'UID encontrado'
+      });
+    }
+
+    return res.status(404).json({
+      code: 404,
+      success: false,
+      message: 'UID no registrado en personas'
     });
+    
   } catch (error) {
     console.error('Error al obtener UID:', error);
     res.status(500).json({
+      code: 500,
       success: false,
       message: 'Error al obtener UID',
       error: error.message
