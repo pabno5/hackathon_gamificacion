@@ -1,17 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, logout, getProfile } = require('../controller/authController');
+const { register, getProfile, getUID } = require('../controller/authController');
 const { verifyToken } = require('../utils/authMiddleware');
 
-// Rutas públicas (no requieren autenticación)
-router.post('/register', register);
-router.post('/login', login);
+// Registro de empleados (requiere autenticación para capturar UID)
+router.post('/register', verifyToken, register);
 
 // Rutas protegidas (requieren autenticación)
-router.post('/logout', verifyToken, logout);
 router.get('/profile', verifyToken, getProfile);
+router.get('/uid', verifyToken, getUID);
 
 module.exports = router;
-
-
-

@@ -1,0 +1,477 @@
+================================
+EJEMPLOS DE USO
+Especialidades, Documentos y Relación Médico-Especialidad
+================================
+
+Nota: Todos los endpoints requieren autenticación.
+Incluye el token en:
+- Cookie: authToken=<token>
+- Header: Authorization: Bearer <token>
+
+================================
+1. ESPECIALIDADES
+================================
+
+--- CREAR ESPECIALIDAD (Admin/Empleado) ---
+POST /api/especialidades
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "nombre": "Cardiología",
+  "descripcion": "Especialidad médica que se ocupa del corazón y del aparato circulatorio",
+  "activa": true
+}
+
+Respuesta:
+{
+  "success": true,
+  "message": "Especialidad creada exitosamente",
+  "data": {
+    "id_especialidad": "uuid...",
+    "nombre": "Cardiología",
+    "descripcion": "Especialidad médica...",
+    "activa": true
+  }
+}
+
+--- LISTAR ESPECIALIDADES ---
+GET /api/especialidades
+GET /api/especialidades?activa=true
+GET /api/especialidades?limit=10&offset=0
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "count": 3,
+  "data": [
+    {
+      "id_especialidad": "uuid-1",
+      "nombre": "Cardiología",
+      "descripcion": "...",
+      "activa": true
+    },
+    {
+      "id_especialidad": "uuid-2",
+      "nombre": "Pediatría",
+      "descripcion": "...",
+      "activa": true
+    }
+  ]
+}
+
+--- OBTENER ESPECIALIDAD POR ID (con sus médicos) ---
+GET /api/especialidades/:id
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "data": {
+    "id_especialidad": "uuid...",
+    "nombre": "Cardiología",
+    "descripcion": "...",
+    "activa": true,
+    "medicos": [
+      {
+        "id_medico": "uuid...",
+        "numero_licencia": "MED-12345",
+        "id_persona": "uuid...",
+        "nombres": "Juan",
+        "apellidos": "Pérez",
+        "correo": "juan.perez@hospital.com",
+        "telefono": "+57 300 1234567"
+      }
+    ]
+  }
+}
+
+--- ACTUALIZAR ESPECIALIDAD (Admin/Empleado) ---
+PUT /api/especialidades/:id
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "descripcion": "Nueva descripción actualizada",
+  "activa": false
+}
+
+--- ELIMINAR ESPECIALIDAD (Admin/Empleado) ---
+DELETE /api/especialidades/:id
+Authorization: Bearer <token>
+
+================================
+2. DOCUMENTOS
+================================
+
+--- CREAR DOCUMENTO (Admin/Empleado) ---
+POST /api/documentos
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "id_persona": "uuid-de-persona",
+  "tipo_documento": "Historia clínica",
+  "enlace": "https://storage.supabase.co/documents/historia-123.pdf"
+}
+
+Tipos de documento sugeridos:
+- "Historia clínica"
+- "Examen de laboratorio"
+- "Radiografía"
+- "Receta médica"
+- "Orden médica"
+- "Resultado de examen"
+- "Consentimiento informado"
+
+Respuesta:
+{
+  "success": true,
+  "message": "Documento creado exitosamente",
+  "data": {
+    "id_documento": "uuid...",
+    "id_persona": "uuid...",
+    "tipo_documento": "Historia clínica",
+    "enlace": "https://...",
+    "fecha_subida": "2024-10-28T..."
+  }
+}
+
+--- LISTAR DOCUMENTOS ---
+GET /api/documentos
+GET /api/documentos?id_persona=uuid-persona
+GET /api/documentos?tipo_documento=Historia%20clínica
+GET /api/documentos?limit=20&offset=0
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "count": 5,
+  "data": [
+    {
+      "id_documento": "uuid...",
+      "id_persona": "uuid...",
+      "tipo_documento": "Historia clínica",
+      "enlace": "https://...",
+      "fecha_subida": "2024-10-28T...",
+      "nombres": "Juan",
+      "apellidos": "Pérez",
+      "numero_documento": "123456789"
+    }
+  ]
+}
+
+--- OBTENER DOCUMENTO POR ID ---
+GET /api/documentos/:id
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "data": {
+    "id_documento": "uuid...",
+    "id_persona": "uuid...",
+    "tipo_documento": "Historia clínica",
+    "enlace": "https://...",
+    "fecha_subida": "2024-10-28T...",
+    "nombres": "Juan",
+    "apellidos": "Pérez",
+    "numero_documento": "123456789",
+    "correo": "juan@email.com"
+  }
+}
+
+--- OBTENER DOCUMENTOS DE UNA PERSONA ---
+GET /api/documentos/persona/:id_persona
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "persona": {
+    "id_persona": "uuid...",
+    "nombres": "Juan",
+    "apellidos": "Pérez"
+  },
+  "count": 3,
+  "data": [
+    {
+      "id_documento": "uuid-1",
+      "tipo_documento": "Historia clínica",
+      "enlace": "https://...",
+      "fecha_subida": "2024-10-28T..."
+    },
+    {
+      "id_documento": "uuid-2",
+      "tipo_documento": "Examen de laboratorio",
+      "enlace": "https://...",
+      "fecha_subida": "2024-10-27T..."
+    }
+  ]
+}
+
+--- OBTENER TIPOS DE DOCUMENTOS DISPONIBLES ---
+GET /api/documentos/tipos
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "data": [
+    "Historia clínica",
+    "Examen de laboratorio",
+    "Radiografía",
+    "Receta médica"
+  ]
+}
+
+--- ACTUALIZAR DOCUMENTO (Admin/Empleado) ---
+PUT /api/documentos/:id
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "tipo_documento": "Examen de laboratorio actualizado",
+  "enlace": "https://nuevo-enlace.pdf"
+}
+
+--- ELIMINAR DOCUMENTO (Admin/Empleado) ---
+DELETE /api/documentos/:id
+Authorization: Bearer <token>
+
+================================
+3. RELACIÓN MÉDICO-ESPECIALIDAD
+================================
+
+Estos endpoints ya están en medicosRoutes.js
+
+--- ASIGNAR ESPECIALIDAD A MÉDICO (Admin/Empleado) ---
+POST /api/medicos/:id_medico/especialidades
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "id_especialidad": "uuid-de-especialidad"
+}
+
+Respuesta:
+{
+  "success": true,
+  "message": "Especialidad asignada exitosamente",
+  "data": {
+    "id_medico_especialidad": "uuid...",
+    "id_medico": "uuid...",
+    "id_especialidad": "uuid..."
+  }
+}
+
+--- REMOVER ESPECIALIDAD DE MÉDICO (Admin/Empleado) ---
+DELETE /api/medicos/:id_medico/especialidades/:id_especialidad
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "message": "Especialidad removida exitosamente"
+}
+
+--- OBTENER MÉDICO CON SUS ESPECIALIDADES ---
+GET /api/medicos/:id_medico
+Authorization: Bearer <token>
+
+Respuesta:
+{
+  "success": true,
+  "data": {
+    "id_medico": "uuid...",
+    "numero_licencia": "MED-12345",
+    "id_persona": "uuid...",
+    "nombres": "Dr. Juan",
+    "apellidos": "Pérez",
+    "correo": "dr.perez@hospital.com",
+    "telefono": "+57 300 1234567",
+    "especialidades": [
+      {
+        "id_especialidad": "uuid-1",
+        "nombre": "Cardiología",
+        "descripcion": "..."
+      },
+      {
+        "id_especialidad": "uuid-2",
+        "nombre": "Medicina General",
+        "descripcion": "..."
+      }
+    ]
+  }
+}
+
+================================
+4. FLUJO COMPLETO DE EJEMPLO
+================================
+
+ESCENARIO: Registrar un médico con especialidades y documentos
+
+1. Crear persona
+POST /api/personas
+{
+  "tipo_documento": "CC",
+  "numero_documento": "123456789",
+  "nombres": "Juan Carlos",
+  "apellidos": "Pérez García",
+  "correo": "dr.perez@hospital.com",
+  "telefono": "+57 300 1234567"
+}
+→ Obtener id_persona
+
+2. Crear médico
+POST /api/medicos
+{
+  "id_persona": "<id_persona>",
+  "numero_licencia": "MED-12345"
+}
+→ Obtener id_medico
+
+3. Crear especialidades (si no existen)
+POST /api/especialidades
+{
+  "nombre": "Cardiología",
+  "descripcion": "..."
+}
+→ Obtener id_especialidad_1
+
+POST /api/especialidades
+{
+  "nombre": "Medicina General",
+  "descripcion": "..."
+}
+→ Obtener id_especialidad_2
+
+4. Asignar especialidades al médico
+POST /api/medicos/<id_medico>/especialidades
+{
+  "id_especialidad": "<id_especialidad_1>"
+}
+
+POST /api/medicos/<id_medico>/especialidades
+{
+  "id_especialidad": "<id_especialidad_2>"
+}
+
+5. Subir documentos del médico (título, licencia, etc.)
+POST /api/documentos
+{
+  "id_persona": "<id_persona>",
+  "tipo_documento": "Título profesional",
+  "enlace": "https://storage/titulo.pdf"
+}
+
+POST /api/documentos
+{
+  "id_persona": "<id_persona>",
+  "tipo_documento": "Licencia médica",
+  "enlace": "https://storage/licencia.pdf"
+}
+
+6. Consultar médico completo
+GET /api/medicos/<id_medico>
+→ Ver médico con todas sus especialidades
+
+7. Consultar documentos del médico
+GET /api/documentos/persona/<id_persona>
+→ Ver todos los documentos del médico
+
+================================
+5. CASOS DE USO PRÁCTICOS
+================================
+
+--- Buscar médicos por especialidad ---
+1. GET /api/especialidades/:id
+   → Obtiene la especialidad con todos sus médicos
+
+--- Filtrar documentos por tipo ---
+GET /api/documentos?tipo_documento=Examen%20de%20laboratorio
+
+--- Obtener historial médico completo de un paciente ---
+GET /api/documentos/persona/:id_paciente
+→ Retorna todos los documentos del paciente
+
+--- Listar solo especialidades activas ---
+GET /api/especialidades?activa=true
+
+--- Obtener tipos únicos de documentos en el sistema ---
+GET /api/documentos/tipos
+→ Útil para crear un dropdown en el frontend
+
+================================
+6. VALIDACIONES Y ERRORES
+================================
+
+Error: Especialidad duplicada
+POST /api/especialidades con nombre existente
+→ 400: "Ya existe una especialidad con ese nombre"
+
+Error: Persona no existe
+POST /api/documentos con id_persona inválido
+→ 404: "Persona no encontrada"
+
+Error: Médico ya tiene esa especialidad
+POST /api/medicos/:id/especialidades (duplicado)
+→ 400: "El médico ya tiene asignada esta especialidad"
+
+Error: Documento asociado a cita
+DELETE /api/documentos/:id (si está en una cita)
+→ 400: "No se puede eliminar el documento porque está asociado a una cita"
+
+Error: Especialidad con médicos
+DELETE /api/especialidades/:id (con médicos asociados)
+→ 400: "No se puede eliminar la especialidad porque tiene médicos asociados"
+
+================================
+7. PERMISOS
+================================
+
+Endpoints públicos (cualquier usuario autenticado):
+- GET /api/especialidades
+- GET /api/especialidades/:id
+- GET /api/documentos
+- GET /api/documentos/:id
+- GET /api/documentos/persona/:id
+- GET /api/documentos/tipos
+
+Endpoints administrativos (Admin o Empleado):
+- POST /api/especialidades
+- PUT /api/especialidades/:id
+- DELETE /api/especialidades/:id
+- POST /api/documentos
+- PUT /api/documentos/:id
+- DELETE /api/documentos/:id
+- POST /api/medicos/:id/especialidades
+- DELETE /api/medicos/:id/especialidades/:id_esp
+
+================================
+8. TIPS PARA EL FRONTEND
+================================
+
+1. Crear dropdown de especialidades:
+   GET /api/especialidades?activa=true
+   → Usa el array para un <select>
+
+2. Crear dropdown de tipos de documento:
+   GET /api/documentos/tipos
+   → Usa el array para un <select>
+
+3. Upload de archivos:
+   - Primero sube el archivo a Supabase Storage
+   - Obtén la URL pública
+   - Luego crea el documento con POST /api/documentos
+
+4. Vista de médico con especialidades:
+   GET /api/medicos/:id
+   → Muestra el médico y todas sus especialidades
+
+5. Perfil de paciente con documentos:
+   GET /api/documentos/persona/:id
+   → Muestra todos los documentos del paciente
+

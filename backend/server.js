@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
 const path = require('path');
 
 // Importar rutas
@@ -11,12 +12,22 @@ const personasRoutes = require('./routes/personasRoutes');
 const medicosRoutes = require('./routes/medicosRoutes');
 const rolesRoutes = require('./routes/rolesRoutes');
 const credencialesRoutes = require('./routes/credencialesRoutes');
+const especialidadesRoutes = require('./routes/especialidadesRoutes');
+const documentosRoutes = require('./routes/documentosRoutes');
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
+// CORS - Permitir peticiones desde el frontend
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(bodyParser.json()); // Para parsear JSON
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -81,6 +92,12 @@ app.use('/api/roles', rolesRoutes);
 
 // Rutas de credenciales (autenticación)
 app.use('/api/credenciales', credencialesRoutes);
+
+// Rutas de especialidades
+app.use('/api/especialidades', especialidadesRoutes);
+
+// Rutas de documentos
+app.use('/api/documentos', documentosRoutes);
 
 // Rutas de citas
 const citasRoutes = require('./routes/citas');
