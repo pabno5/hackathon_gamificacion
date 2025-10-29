@@ -24,11 +24,9 @@ const verifyToken = async (req, res, next) => {
     // Verificar el token de Firebase
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     
-    // Agregar los datos del usuario al request
+    // Agregar solo el UID del usuario al request
     req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      rol: decodedToken.rol || null // El rol está en custom claims
+      uid: decodedToken.uid
     };
 
     next();
@@ -51,25 +49,67 @@ const verifyToken = async (req, res, next) => {
 };
 
 // Middleware para verificar si el usuario es administrador
-const verifyAdmin = (req, res, next) => {
-  if (req.user.rol !== 'administrador') {
-    return res.status(403).json({
+const verifyAdmin = async (req, res, next) => {
+  try {
+    // Obtener el rol del usuario desde Firestore usando el UID
+    const userDoc = await admin.firestore().collection('usuarios').doc(req.user.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado.'
+      });
+    }
+    
+    const userData = userDoc.data();
+    
+    if (userData.rol !== 'administrador') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Se requiere rol de administrador.'
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Error en verificación de administrador:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Acceso denegado. Se requiere rol de administrador.'
+      message: 'Error interno del servidor.'
     });
   }
-  next();
 };
 
 // Middleware para verificar si el usuario es administrador o empleado
-const verifyAdminOrEmployee = (req, res, next) => {
-  if (req.user.rol !== 'administrador' && req.user.rol !== 'empleado') {
-    return res.status(403).json({
+const verifyAdminOrEmployee = async (req, res, next) => {
+  try {
+    // Obtener el rol del usuario desde Firestore usando el UID
+    const userDoc = await admin.firestore().collection('usuarios').doc(req.user.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado.'
+      });
+    }
+    
+    const userData = userDoc.data();
+    
+    if (userData.rol !== 'administrador' && userData.rol !== 'empleado') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Se requiere rol de administrador o empleado.'
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Error en verificación de rol:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Acceso denegado. Se requiere rol de administrador o empleado.'
+      message: 'Error interno del servidor.'
     });
   }
-  next();
 };
 
 module.exports = {
@@ -77,6 +117,3 @@ module.exports = {
   verifyAdmin,
   verifyAdminOrEmployee
 };
-
-
-
