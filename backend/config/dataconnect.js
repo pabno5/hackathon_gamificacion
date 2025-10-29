@@ -10,7 +10,7 @@ const pool = new Pool({
   // Configuración de pool
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 });
 
 // Probar conexión
