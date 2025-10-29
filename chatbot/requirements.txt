@@ -1,0 +1,12 @@
+chromadb==0.5.11
+sentence_transformers==5.1.1
+pypdf==4.2.0
+numpy==1.24.0
+pandas==2.0.0
+faiss-cpu==1.7.0
+pypdf==3.0.0
+fastapi==0.100.0
+uvicorn==0.23.0
+pydantic==2.0.0
+ollama==0.1.0
+langchain-ollama==0.1.0
