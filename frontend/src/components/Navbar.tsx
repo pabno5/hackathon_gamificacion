@@ -3,9 +3,10 @@ import logoImage from "../assets/logo.png";
 
 interface NavbarProps {
   onLoginClick: () => void;
+  onAgendarClick?: () => void;
 }
 
-export function Navbar({ onLoginClick }: NavbarProps) {
+export function Navbar({ onLoginClick, onAgendarClick }: NavbarProps) {
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -30,6 +31,7 @@ export function Navbar({ onLoginClick }: NavbarProps) {
           <div className="flex items-center gap-4">
             <Button 
               className="bg-[#03D4D9] hover:bg-[#01EDDF] text-white rounded-full px-6 transition-colors"
+              onClick={onAgendarClick}
             >
               Agendar cita
             </Button>

@@ -103,11 +103,27 @@ app.use('/api/documentos', documentosRoutes);
 const citasRoutes = require('./routes/citas');
 app.use('/api/citas', citasRoutes);
 
+// Ruta para ver estadísticas de sincronización
+const calendarSyncService = require('./services/calendarSyncService');
+app.get('/api/calendar/sync-stats', (req, res) => {
+  res.json(calendarSyncService.getStats());
+});
+
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
   console.log(`🔧 Modo: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Test conexión: http://localhost:${PORT}/test-connection`);
+  
+  // Iniciar sincronización automática de Google Calendar
+  // Configuración desde .env o por defecto cada 15 minutos
+  const syncInterval = process.env.GOOGLE_CALENDAR_SYNC_INTERVAL || '*/15 * * * *';
+  
+  if (process.env.GOOGLE_CALENDAR_AUTO_SYNC !== 'false') {
+    calendarSyncService.start(syncInterval);
+  } else {
+    console.log('⚠️  Sincronización automática de Google Calendar deshabilitada (GOOGLE_CALENDAR_AUTO_SYNC=false)');
+  }
 });
 
 module.exports = app;

@@ -16,6 +16,11 @@ config/firebase-credentials.json
 **/firebase-credentials.json
 firebase-adminsdk-*.json
 
+# Google Calendar credentials
+credentials/
+**/google-calendar-credentials.json
+*-credentials.json
+
 # Logs
 logs/
 *.log
