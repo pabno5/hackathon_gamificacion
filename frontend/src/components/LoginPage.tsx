@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Progress } from "./ui/progress";
 import { GeneratedHistoriaClinica } from "./GeneratedHistoriaClinica";
 import { SchedulingSection } from "./SchedulingSection";
+import { personasAPI } from "../service/api";
 
 interface LoginPageProps {
   onBack: () => void;
@@ -204,14 +205,45 @@ export function LoginPage({ onBack }: LoginPageProps) {
     }
   };
 
-  const handleExistingUserSubmit = (e: React.FormEvent) => {
+  const handleExistingUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (existingUserCedula.trim()) {
-      toast.success("Usuario encontrado. Completando datos...");
-      updateProgress(10, "Datos del usuario recuperados");
-      setCurrentView("generarHistoria");
-    } else {
+    
+    if (!existingUserCedula.trim()) {
       toast.error("Por favor ingresa un número de cédula válido");
+      return;
+    }
+
+    try {
+      // Buscar usuario en el backend
+      toast.loading("Buscando usuario...");
+      const response = await personasAPI.getByDocumento(existingUserCedula.trim());
+      
+      // Cerrar el toast de loading
+      toast.dismiss();
+      
+      if (response.data.success && response.data.data) {
+        // Usuario encontrado
+        const usuario = response.data.data;
+        toast.success(`¡Usuario encontrado! Bienvenido ${usuario.nombres} ${usuario.apellidos}`);
+        updateProgress(10, "Datos del usuario recuperados");
+        
+        // Aquí puedes guardar los datos del usuario si los necesitas después
+        // setUserData(usuario);
+        
+        setCurrentView("generarHistoria");
+      } else {
+        // Usuario no encontrado
+        toast.error("No se encontró ningún usuario con ese número de cédula");
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      console.error("Error al buscar usuario:", error);
+      
+      if (error.response?.status === 404) {
+        toast.error("No se encontró ningún usuario con ese número de cédula. Por favor verifica el número o regístrate como nuevo usuario.");
+      } else {
+        toast.error("Error al buscar el usuario. Por favor intenta de nuevo.");
+      }
     }
   };
 
