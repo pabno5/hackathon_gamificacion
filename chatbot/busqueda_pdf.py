@@ -4,14 +4,13 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import numpy as np
 import faiss
 import ollama
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import sqlite3
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware  # ← IMPORTAR CORS
 from pydantic import BaseModel
 import uvicorn
-import re
 import uuid
 from pypdf import PdfReader
 from langchain_ollama import OllamaEmbeddings
@@ -25,6 +24,7 @@ PDF_PATH = "./documentos/Protocolos Call Center Salud Oftalmología.pdf"
 DB_PATH = "documentos.db"
 EMBED_MODEL = "mxbai-embed-large:latest"
 OLLAMA_MODEL = "mistral"
+UMBRAL_RELEVANCIA = 1.5  # Distancia máxima para considerar un resultado relevante
 
 
 # ==============================
@@ -81,7 +81,6 @@ Ahora escribe tu resumen conversacional:
             response = ollama.generate(model=OLLAMA_MODEL, prompt=prompt)
             return response["response"].strip()
 
-
         with ThreadPoolExecutor(max_workers=8) as executor:
             summaries = list(executor.map(resumir_texto, fragments))
 
@@ -115,106 +114,137 @@ embedded_docs = np.array(embedded_docs)
 index = faiss.IndexFlatL2(embedded_docs.shape[1])
 index.add(embedded_docs)
 
+
 # ==============================
-# 🔎 BÚSQUEDA MEJORADA
+# 🔎 BÚSQUEDA Y RESPUESTA MEJORADA
 # ==============================
 
-def buscar_por_contenido(query, k=5):
-    """Búsqueda mejorada con contexto conversacional"""
+def buscar_y_responder(query, k=5):
+    """
+    Búsqueda semántica que devuelve UNA respuesta única.
+    Primero busca en el PDF, si no encuentra info relevante, usa conocimiento general.
+    """
     
-    # Enriquecer la consulta para mejor matching semántico
-    prompt_enriquecido = f"""
-Consulta del usuario: "{query}"
-
-Reformula esta consulta considerando sinónimos y conceptos relacionados 
-con protocolos de call center en salud oftalmológica, gestión de pacientes, 
-coordinación médica, y procedimientos operativos.
-
-Reformulación:
-"""
-    
-    try:
-        respuesta_reformulacion = ollama.generate(
-            model=OLLAMA_MODEL, 
-            prompt=prompt_enriquecido,
-            options={'temperature': 0.3}
-        )
-        query_mejorada = respuesta_reformulacion["response"].strip()
-    except:
-        query_mejorada = query
-
-    # Búsqueda semántica
-    embedding_query = embeddings.embed_query(f"Protocolo call center salud: {query_mejorada}")
+    # 1. Búsqueda semántica
+    embedding_query = embeddings.embed_query(f"Protocolo call center salud: {query}")
     embedding_query = np.array([embedding_query])
     distances, indices = index.search(embedding_query, k)
-
-    resultados = data.iloc[indices[0]]
-    return resultados, query_mejorada
-
-
-def generar_respuesta_conversacional(query, resultados):
-    """Genera una respuesta natural integrando los resultados"""
     
-    contextos = "\n\n".join([f"Contexto {i+1}: {row['resumen']}" 
-                            for i, (_, row) in enumerate(resultados.iterrows())])
+    # 2. Filtrar por relevancia
+    resultados_relevantes = []
+    for i, dist in enumerate(distances[0]):
+        if dist < UMBRAL_RELEVANCIA:
+            idx = indices[0][i]
+            resultados_relevantes.append({
+                'resumen': data.iloc[idx]['resumen'],
+                'distancia': float(dist)
+            })
     
-    prompt_respuesta = f"""
-Eres un asistente especializado en protocolos de call center de salud oftalmológica.
-El usuario pregunta: "{query}"
+    # 3. Generar respuesta única
+    if resultados_relevantes:
+        # HAY información relevante en el PDF
+        contextos = "\n\n".join([f"- {r['resumen']}" for r in resultados_relevantes[:3]])
+        
+        prompt = f"""
+Eres un asistente de call center de salud oftalmológica. Un usuario pregunta:
+"{query}"
 
-Usa la siguiente información del manual para responder de forma breve y clara.
-- Explica solo lo necesario.
-- No repitas frases del texto.
-- Evita lenguaje formal o técnico.
-- Da una respuesta simple y fácil de entender (máximo 3 líneas).
-
-Contextos relevantes:
+Basándote ÚNICAMENTE en esta información del manual:
 {contextos}
 
-Respuesta corta:
+Genera UNA respuesta clara y concisa que:
+- Sea directa y específica (2-4 líneas máximo)
+- Use lenguaje natural y fluido
+- NO copies textualmente del documento
+- Integre la información de forma coherente
+- Si hay varios pasos, enuméralos brevemente
+
+Respuesta:
 """
+        
+        fuente = "pdf"
+        
+    else:
+        # NO hay información relevante, usar conocimiento general
+        prompt = f"""
+Eres un asistente de call center de salud oftalmológica. Un usuario pregunta:
+"{query}"
+
+No encontraste información específica en el manual de protocolos, así que responde basándote en:
+- Mejores prácticas de atención al cliente en salud
+- Procedimientos estándar de call centers médicos
+- Tu conocimiento general sobre oftalmología
+
+Genera UNA respuesta útil y profesional que:
+- Sea práctica y aplicable
+- Tenga 2-4 líneas
+- Mencione que es una recomendación general (ya que no está en el manual)
+
+Respuesta:
+"""
+        
+        fuente = "conocimiento_general"
     
+    # 4. Generar respuesta
     try:
-        respuesta = ollama.generate(
-            model=OLLAMA_MODEL, 
-            prompt=prompt_respuesta,
-            options={'temperature': 0.3}
+        respuesta_llm = ollama.generate(
+            model=OLLAMA_MODEL,
+            prompt=prompt,
+            options={'temperature': 0.4, 'num_predict': 200}
         )
-        return respuesta["response"].strip()
+        respuesta_final = respuesta_llm["response"].strip()
     except Exception as e:
-        # Fallback: devolver los resúmenes originales
-        return "\n".join([f"• {row['resumen']}" for _, row in resultados.iterrows()])
-
-# ==============================
-# 🚀 API FASTAPI
-# ==============================
-
-app = FastAPI()
-
-class BusquedaRequest(BaseModel):
-    query: str
-    k: int = 7
-
-
-@app.post("/buscar")
-def buscar(request: BusquedaRequest):
-    resultados, query_mejorada = buscar_por_contenido(request.query, k=request.k)
-    respuesta_conversacional = generar_respuesta_conversacional(request.query, resultados)
+        respuesta_final = "Lo siento, hubo un error al procesar tu consulta. ¿Podrías reformularla?"
+        fuente = "error"
     
     return {
-        "respuesta": respuesta_conversacional,
-        "query_mejorada": query_mejorada,
-        "resultados_detallados": resultados[["id", "resumen"]].to_dict(orient="records")
+        "respuesta": respuesta_final,
+        "fuente": fuente,
+        "resultados_encontrados": len(resultados_relevantes),
+        "detalles": resultados_relevantes if resultados_relevantes else []
     }
 
 
 # ==============================
-# 🧠 MODO CONSOLA MEJORADO
+# 🚀 API FASTAPI CON CORS
+# ==============================
+
+app = FastAPI()
+
+# ← CONFIGURAR CORS AQUÍ
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción, especifica los dominios exactos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class BusquedaRequest(BaseModel):
+    query: str
+    k: int = 5
+
+
+@app.post("/buscar")
+def buscar(request: BusquedaRequest):
+    resultado = buscar_y_responder(request.query, k=request.k)
+    return resultado
+
+
+@app.get("/")
+def root():
+    return {"message": "API de búsqueda en PDF funcionando correctamente"}
+
+
+# ==============================
+# 🧠 MODO CONSOLA
 # ==============================
 
 if __name__ == "__main__":
     import sys
     if "runserver" in sys.argv:
+        print("🚀 Iniciando servidor en http://localhost:8000")
+        print("📖 Documentación: http://localhost:8000/docs")
         uvicorn.run("busqueda_pdf:app", host="0.0.0.0", port=8000, reload=True)
     else:
         print("📘 Asistente sobre PDF listo. Escribe tu consulta o 'salir' para terminar.\n")
@@ -224,17 +254,25 @@ if __name__ == "__main__":
                 print("👋 Hasta luego.")
                 break
 
-            resultados, query_mejorada = buscar_por_contenido(query)
-            respuesta = generar_respuesta_conversacional(query, resultados)
+            resultado = buscar_y_responder(query)
             
-            print(f"\n🤖 Asistente: {respuesta}\n")
+            # Mostrar respuesta principal
+            print(f"\n🤖 Asistente: {resultado['respuesta']}")
+            
+            # Indicador de fuente
+            if resultado['fuente'] == 'pdf':
+                print(f"   📄 [Basado en el manual - {resultado['resultados_encontrados']} referencias]")
+            elif resultado['fuente'] == 'conocimiento_general':
+                print(f"   💡 [Recomendación general - no encontrado en el manual]")
+            
             print("-" * 60)
             
-            # Opcional: mostrar detalles de búsqueda
-            mostrar_detalles = input("\n¿Ver detalles de búsqueda? (s/n): ").strip().lower()
-            if mostrar_detalles == 's':
-                print(f"\n🔍 Query mejorada: {query_mejorada}")
-                print("\n📋 Fragmentos relevantes encontrados:")
-                for i, (_, row) in enumerate(resultados.iterrows()):
-                    print(f"{i+1}. {row['resumen']}")
-                print("-" * 60 + "\n")
+            # Opcional: ver detalles
+            if resultado['detalles']:
+                mostrar = input("\n¿Ver fragmentos del manual? (s/n): ").strip().lower()
+                if mostrar == 's':
+                    print("\n📋 Fragmentos relevantes:")
+                    for i, det in enumerate(resultado['detalles'][:3], 1):
+                        print(f"\n{i}. {det['resumen']}")
+                        print(f"   (Relevancia: {det['distancia']:.3f})")
+                    print("-" * 60 + "\n")
