@@ -86,6 +86,7 @@ CREATE TABLE citas (
     motivo VARCHAR(255),
     estado VARCHAR(50) DEFAULT 'pendiente',  -- pendiente, confirmada, cancelada, completada
     observaciones TEXT,
+    google_calendar_event_id VARCHAR(255) UNIQUE,  -- 📅 ID del evento en Google Calendar
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_paciente) REFERENCES personas (id_persona)
         ON UPDATE CASCADE ON DELETE CASCADE,
@@ -94,3 +95,6 @@ CREATE TABLE citas (
     FOREIGN KEY (id_documento) REFERENCES documentos (id_documento)
         ON UPDATE CASCADE ON DELETE SET NULL
 );
+
+-- Índice para búsquedas rápidas por google_calendar_event_id
+CREATE INDEX idx_citas_google_calendar_event_id ON citas(google_calendar_event_id);

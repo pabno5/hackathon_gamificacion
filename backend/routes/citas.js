@@ -4,6 +4,12 @@ const multer = require('multer');
 const { query, admin } = require('../config/dataconnect');
 const { verifyToken } = require('../utils/authMiddleware');
 const { uploadFile } = require('../config/supabase');
+const { 
+  createCalendarEvent, 
+  updateCalendarEvent, 
+  deleteCalendarEvent,
+  syncFromGoogleCalendar
+} = require('../config/googleCalendar');
 
 // Configurar multer para almacenar archivos en memoria
 const storage = multer.memoryStorage();
@@ -144,8 +150,22 @@ router.post('/', upload.single('documento'), async (req, res) => {
       ]
     );
 
-    // Si se creó un documento, incluir la información en la respuesta
     let responseData = result.rows[0];
+
+    // Crear evento en Google Calendar
+    const googleEventId = await createCalendarEvent(responseData);
+    
+    // Si se creó el evento en Google Calendar, actualizar la cita con el ID
+    if (googleEventId) {
+      await query(
+        'UPDATE citas SET google_calendar_event_id = $1 WHERE id_cita = $2',
+        [googleEventId, responseData.id_cita]
+      );
+      responseData.google_calendar_event_id = googleEventId;
+      console.log('📅 Cita sincronizada con Google Calendar');
+    }
+
+    // Si se creó un documento, incluir la información en la respuesta
     if (id_documento) {
       const documentoInfo = await query(
         'SELECT * FROM documentos WHERE id_documento = $1',
@@ -375,9 +395,19 @@ router.put('/:id', async (req, res) => {
       valores
     );
 
+    const updatedCita = result.rows[0];
+
+    // Actualizar evento en Google Calendar si existe
+    if (updatedCita.google_calendar_event_id) {
+      const updated = await updateCalendarEvent(updatedCita.google_calendar_event_id, updatedCita);
+      if (updated) {
+        console.log('📅 Evento actualizado en Google Calendar');
+      }
+    }
+
     return res.json({
       success: true,
-      data: result.rows[0]
+      data: updatedCita
     });
   } catch (err) {
     return handleError(res, err, 'Error al actualizar cita');
@@ -405,7 +435,15 @@ router.delete('/:id', async (req, res) => {
 
     const citaData = checkCita.rows[0];
 
-    // Eliminar cita
+    // Eliminar evento de Google Calendar si existe
+    if (citaData.google_calendar_event_id) {
+      const deleted = await deleteCalendarEvent(citaData.google_calendar_event_id);
+      if (deleted) {
+        console.log('📅 Evento eliminado de Google Calendar');
+      }
+    }
+
+    // Eliminar cita de la base de datos
     await query('DELETE FROM citas WHERE id_cita = $1', [id]);
 
     return res.json({
@@ -415,6 +453,120 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (err) {
     return handleError(res, err, 'Error al eliminar cita');
+  }
+});
+
+// Sincronizar citas desde Google Calendar
+router.post('/sync-from-google-calendar', async (req, res) => {
+  try {
+    const { from, to } = req.body;
+
+    // Validar fechas
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        error: 'Las fechas "from" y "to" son obligatorias'
+      });
+    }
+
+    const timeMin = new Date(from);
+    const timeMax = new Date(to);
+
+    // Obtener eventos desde Google Calendar
+    const events = await syncFromGoogleCalendar(timeMin, timeMax);
+
+    if (events.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No hay eventos nuevos para sincronizar',
+        synced: 0
+      });
+    }
+
+    let syncedCount = 0;
+    const errors = [];
+
+    // Procesar cada evento
+    for (const event of events) {
+      try {
+        // Verificar si el evento ya existe en la BD
+        const existingCita = await query(
+          'SELECT * FROM citas WHERE google_calendar_event_id = $1',
+          [event.id]
+        );
+
+        if (existingCita.rows.length > 0) {
+          // El evento ya existe, saltarlo
+          continue;
+        }
+
+        // Verificar si es un evento creado desde la app (tiene metadata)
+        if (event.extendedProperties?.private?.citaId) {
+          // Ya existe en la BD con otro ID, saltar
+          continue;
+        }
+
+        // Crear nueva cita desde el evento de Google Calendar
+        // Nota: Necesitarás tener paciente y médico por defecto o extraerlos de alguna manera
+        const defaultPacienteResult = await query(
+          'SELECT id_persona FROM personas LIMIT 1'
+        );
+        const defaultMedicoResult = await query(
+          'SELECT id_medico FROM medicos LIMIT 1'
+        );
+
+        if (defaultPacienteResult.rows.length === 0 || defaultMedicoResult.rows.length === 0) {
+          errors.push({
+            eventId: event.id,
+            error: 'No hay pacientes o médicos en la base de datos'
+          });
+          continue;
+        }
+
+        const newCita = await query(
+          `INSERT INTO citas (
+            id_paciente, 
+            id_medico, 
+            fecha_cita, 
+            motivo, 
+            estado, 
+            observaciones,
+            google_calendar_event_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING *`,
+          [
+            defaultPacienteResult.rows[0].id_persona,
+            defaultMedicoResult.rows[0].id_medico,
+            new Date(event.start.dateTime || event.start.date),
+            event.summary || 'Cita desde Google Calendar',
+            event.status === 'cancelled' ? 'cancelada' : 'confirmada',
+            event.description || null,
+            event.id
+          ]
+        );
+
+        syncedCount++;
+        console.log('📅 Cita sincronizada desde Google Calendar:', event.id);
+
+      } catch (error) {
+        console.error('Error al sincronizar evento:', event.id, error);
+        errors.push({
+          eventId: event.id,
+          error: error.message
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Sincronización completada. ${syncedCount} citas importadas.`,
+      synced: syncedCount,
+      total: events.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+  } catch (err) {
+    return handleError(res, err, 'Error al sincronizar desde Google Calendar');
   }
 });
 
