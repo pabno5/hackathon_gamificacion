@@ -30,8 +30,32 @@ export const authAPI = {
 
 // ============ CITAS ============
 export const citasAPI = {
-  // Crear cita
-  create: (data) => api.post('/citas', data),
+  // Crear cita (con soporte para archivos)
+  create: (data, file = null) => {
+    if (file) {
+      // Si hay archivo, usar FormData
+      const formData = new FormData();
+      
+      // Agregar campos de la cita
+      Object.keys(data).forEach(key => {
+        if (data[key] !== null && data[key] !== undefined) {
+          formData.append(key, data[key]);
+        }
+      });
+      
+      // Agregar el archivo
+      formData.append('documento', file);
+      
+      return api.post('/citas', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } else {
+      // Sin archivo, enviar JSON normal
+      return api.post('/citas', data);
+    }
+  },
   
   // Listar citas con filtros opcionales
   getAll: (params = {}) => api.get('/citas', { params }),

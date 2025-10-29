@@ -1,7 +1,38 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { query, admin } = require('../config/dataconnect');
 const { verifyToken } = require('../utils/authMiddleware');
+const { uploadFile } = require('../config/supabase');
+
+// Configurar multer para almacenar archivos en memoria
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // Límite de 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    // Aceptar cualquier tipo de archivo (puedes restringir si lo deseas)
+    // Tipos permitidos comunes: pdf, jpg, png, docx, etc.
+    const allowedMimes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}. Solo se permiten PDF, imágenes (JPG, PNG) y documentos (DOC, DOCX, XLS, XLSX).`), false);
+    }
+  }
+});
 
 // TEMPORALMENTE DESHABILITADO PARA TESTING
 // TODO: Habilitar autenticación en producción
@@ -22,11 +53,13 @@ const isValidUUID = (uuid) => {
   return uuidRegex.test(uuid);
 };
 
-// Create a new cita
-router.post('/', async (req, res) => {
+// Create a new cita (con documento opcional)
+router.post('/', upload.single('documento'), async (req, res) => {
   try {
-    const { id_paciente, id_medico, fecha_cita, motivo, estado, observaciones } = req.body;
+    const { id_paciente, id_medico, fecha_cita, motivo, estado, observaciones, tipo_documento } = req.body;
+    const file = req.file; // Archivo opcional
 
+    // Validar campos obligatorios
     if (!id_paciente || !id_medico || !fecha_cita) {
       return res.status(400).json({
         success: false,
@@ -60,11 +93,45 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Insertar cita
+    let id_documento = null;
+
+    // Si hay un archivo, procesarlo
+    if (file) {
+      console.log('📄 Archivo recibido:', file.originalname, `(${file.size} bytes)`);
+
+      // Subir archivo a Supabase Storage
+      const uploadResult = await uploadFile(file.buffer, file.originalname);
+
+      if (!uploadResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: `Error al subir el archivo: ${uploadResult.error}`
+        });
+      }
+
+      console.log('✅ Archivo subido a Supabase Storage:', uploadResult.url);
+
+      // Crear registro en la tabla documentos
+      const documentoResult = await query(
+        `INSERT INTO documentos (id_persona, tipo_documento, enlace)
+         VALUES ($1, $2, $3)
+         RETURNING id_documento`,
+        [
+          id_paciente,
+          tipo_documento || 'Documento de cita',
+          uploadResult.url
+        ]
+      );
+
+      id_documento = documentoResult.rows[0].id_documento;
+      console.log('✅ Documento creado en BD con ID:', id_documento);
+    }
+
+    // Insertar cita (con o sin documento)
     const result = await query(
       `INSERT INTO citas (
-        id_paciente, id_medico, fecha_cita, motivo, estado, observaciones
-      ) VALUES ($1, $2, $3, $4, $5, $6)
+        id_paciente, id_medico, fecha_cita, motivo, estado, observaciones, id_documento
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *`,
       [
         id_paciente,
@@ -72,15 +139,41 @@ router.post('/', async (req, res) => {
         fecha_cita,
         motivo || null,
         estado || 'pendiente',
-        observaciones || null
+        observaciones || null,
+        id_documento
       ]
     );
 
+    // Si se creó un documento, incluir la información en la respuesta
+    let responseData = result.rows[0];
+    if (id_documento) {
+      const documentoInfo = await query(
+        'SELECT * FROM documentos WHERE id_documento = $1',
+        [id_documento]
+      );
+      responseData.documento = documentoInfo.rows[0];
+    }
+
     return res.status(201).json({
       success: true,
-      data: result.rows[0]
+      data: responseData,
+      message: file ? 'Cita creada con documento exitosamente' : 'Cita creada exitosamente'
     });
   } catch (err) {
+    // Si es un error de multer
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: 'El archivo es demasiado grande. Tamaño máximo: 10MB'
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: `Error al procesar el archivo: ${err.message}`
+      });
+    }
+    
     return handleError(res, err, 'Error al crear cita');
   }
 });
@@ -141,10 +234,27 @@ router.get('/', async (req, res) => {
 
     const result = await query(sqlQuery, params);
 
+    // Para cada cita, obtener el documento si existe
+    const citasConDocumentos = await Promise.all(
+      result.rows.map(async (cita) => {
+        if (cita.id_documento) {
+          const documentoResult = await query(
+            'SELECT * FROM documentos WHERE id_documento = $1',
+            [cita.id_documento]
+          );
+          
+          if (documentoResult.rows.length > 0) {
+            cita.documento = documentoResult.rows[0];
+          }
+        }
+        return cita;
+      })
+    );
+
     return res.json({ 
       success: true, 
-      count: result.rows.length,
-      data: result.rows 
+      count: citasConDocumentos.length,
+      data: citasConDocumentos 
     });
   } catch (err) {
     return handleError(res, err, 'Error al listar citas');
@@ -169,9 +279,23 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Cita no encontrada' });
     }
 
+    const citaData = result.rows[0];
+
+    // Si la cita tiene un documento asociado, obtener su información
+    if (citaData.id_documento) {
+      const documentoResult = await query(
+        'SELECT * FROM documentos WHERE id_documento = $1',
+        [citaData.id_documento]
+      );
+      
+      if (documentoResult.rows.length > 0) {
+        citaData.documento = documentoResult.rows[0];
+      }
+    }
+
     return res.json({
       success: true,
-      data: result.rows[0]
+      data: citaData
     });
   } catch (err) {
     return handleError(res, err, 'Error al obtener cita');

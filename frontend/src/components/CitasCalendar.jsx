@@ -87,21 +87,30 @@ const CitasCalendar = () => {
     setShowModal(true);
   };
 
-  // Handler para guardar cita
-  const handleSaveCita = async (citaData) => {
+  // Handler para guardar cita (con soporte para archivos)
+  const handleSaveCita = async (citaData, file = null) => {
     try {
       if (selectedCita?.id_cita) {
-        // Actualizar
+        // Actualizar (sin soporte de archivo por ahora)
         const response = await citasAPI.update(selectedCita.id_cita, citaData);
         if (response.data.success) {
           alert('Cita actualizada exitosamente');
           loadCitas();
         }
       } else {
-        // Crear nueva
-        const response = await citasAPI.create(citaData);
+        // Crear nueva (con soporte de archivo)
+        const response = await citasAPI.create(citaData, file);
         if (response.data.success) {
-          alert('Cita creada exitosamente');
+          const mensaje = file 
+            ? 'Cita creada exitosamente con documento adjunto' 
+            : 'Cita creada exitosamente';
+          alert(mensaje);
+          
+          // Mostrar información del documento si se subió
+          if (response.data.data?.documento) {
+            console.log('Documento subido:', response.data.data.documento);
+          }
+          
           loadCitas();
         }
       }

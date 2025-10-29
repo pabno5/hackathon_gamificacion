@@ -4,8 +4,8 @@ require('dotenv').config();
 
 // Configuración de conexión a Supabase (PostgreSQL)
 const pool = new Pool({
-  // Opción 1: Usar DATABASE_URL de Supabase (recomendado)
-  connectionString: process.env.SUPABASE_URL,
+  // Usar SUPABASE_URL con transaction pooler de Supabase
+  connectionString: process.env.SUPABASE_DATABASE_URL,
   
   // Configuración de pool
   max: 20,

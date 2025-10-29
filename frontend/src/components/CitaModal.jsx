@@ -9,12 +9,21 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
     motivo: '',
     estado: 'pendiente',
     observaciones: '',
+    tipo_documento: '',
   });
 
   const [errors, setErrors] = useState({});
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
 
   useEffect(() => {
     if (cita) {
+      // DEBUG: Ver datos de la cita
+      console.log('📋 Datos de la cita:', cita);
+      console.log('📄 cita.documento:', cita.documento);
+      console.log('📍 cita.ubicacion:', cita.ubicacion);
+      console.log('🔗 cita.id_documento:', cita.id_documento);
+      
       setFormData({
         id_paciente: cita.id_paciente || '',
         id_medico: cita.id_medico || '',
@@ -24,7 +33,34 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
         motivo: cita.motivo || '',
         estado: cita.estado || 'pendiente',
         observaciones: cita.observaciones || '',
+        tipo_documento: '',
       });
+      
+      // Si la cita tiene un documento asociado, mostrarlo
+      // Primero buscar en cita.documento, luego en cita.ubicacion
+      if (cita.documento && cita.documento.enlace) {
+        console.log('✅ Encontrado documento en cita.documento.enlace');
+        setFilePreview({
+          name: cita.documento.tipo_documento || 'Documento adjunto',
+          url: cita.documento.enlace,
+          existing: true,
+        });
+      } else if (cita.ubicacion) {
+        console.log('✅ Encontrado documento en cita.ubicacion');
+        // Si no hay objeto documento pero hay ubicacion, usar ese campo
+        setFilePreview({
+          name: 'Documento adjunto',
+          url: cita.ubicacion,
+          existing: true,
+        });
+      } else {
+        console.log('❌ No se encontró documento en la cita');
+        setFilePreview(null);
+      }
+    } else {
+      // Limpiar archivo al crear nueva cita
+      setSelectedFile(null);
+      setFilePreview(null);
     }
   }, [cita]);
 
@@ -40,6 +76,56 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
         ...prev,
         [name]: ''
       }));
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    
+    if (file) {
+      // Validar tamaño (10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB en bytes
+      if (file.size > maxSize) {
+        alert('El archivo es demasiado grande. Tamaño máximo: 10MB');
+        e.target.value = '';
+        return;
+      }
+
+      // Validar tipo de archivo
+      const allowedTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        alert('Tipo de archivo no permitido. Solo se permiten: PDF, imágenes (JPG, PNG) y documentos (DOC, DOCX, XLS, XLSX)');
+        e.target.value = '';
+        return;
+      }
+
+      setSelectedFile(file);
+      setFilePreview({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        existing: false,
+      });
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    // Limpiar el input file
+    const fileInput = document.getElementById('documento');
+    if (fileInput) {
+      fileInput.value = '';
     }
   };
 
@@ -73,13 +159,22 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
       return;
     }
 
+    // Si hay archivo y no hay tipo de documento, usar el nombre del archivo
+    if (selectedFile && !formData.tipo_documento.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        tipo_documento: 'Documento de cita'
+      }));
+    }
+
     // Convertir fecha a ISO string para el backend
     const dataToSend = {
       ...formData,
       fecha_cita: new Date(formData.fecha_cita).toISOString(),
     };
 
-    onSave(dataToSend);
+    // Pasar datos y archivo al parent component
+    onSave(dataToSend, selectedFile);
   };
 
   const handleDelete = () => {
@@ -196,6 +291,88 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
               placeholder="Observaciones adicionales..."
               rows={4}
             />
+          </div>
+
+          {/* Sección de documento opcional */}
+          <div className="document-section">
+            <h4>📎 Documento Adjunto (Opcional)</h4>
+            
+            {!cita?.id_cita && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="tipo_documento">Tipo de Documento</label>
+                  <input
+                    type="text"
+                    id="tipo_documento"
+                    name="tipo_documento"
+                    value={formData.tipo_documento}
+                    onChange={handleChange}
+                    placeholder="Ej: Examen de laboratorio, Radiografía, etc."
+                    maxLength={50}
+                  />
+                  <small className="form-hint">
+                    Describe el tipo de documento que estás adjuntando
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="documento">Archivo</label>
+                  <input
+                    type="file"
+                    id="documento"
+                    name="documento"
+                    onChange={handleFileChange}
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                  />
+                  <small className="form-hint">
+                    Formatos permitidos: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Máx. 10MB)
+                  </small>
+                </div>
+              </>
+            )}
+
+            {/* Vista previa del archivo */}
+            {filePreview && (
+              <div className="file-preview">
+                <div className="file-info">
+                  {filePreview.existing ? (
+                    <>
+                      <span className="file-icon">📄</span>
+                      <div className="file-details">
+                        <strong>{filePreview.name}</strong>
+                        <a 
+                          href={filePreview.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="file-link"
+                          onClick={(e) => {
+                            console.log('Abriendo documento:', filePreview.url);
+                          }}
+                        >
+                          📥 Abrir Documento
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="file-icon">📄</span>
+                      <div className="file-details">
+                        <strong>{filePreview.name}</strong>
+                        <small>{(filePreview.size / 1024).toFixed(2)} KB</small>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-remove-file"
+                        onClick={handleRemoveFile}
+                        title="Eliminar archivo"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="modal-actions">
