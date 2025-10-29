@@ -3,7 +3,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { citasAPI, personasAPI, medicosAPI } from '../services/api';
+import { citasAPI, personasAPI, medicosAPI } from '../../service/api';
 import CitaModal from './CitaModal';
 import './CitasCalendar.css';
 
