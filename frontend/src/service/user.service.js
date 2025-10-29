@@ -1,26 +1,38 @@
 import { auth } from "../config/firebase.config.js";
 import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 
+// URL base del backend
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4040';
+
 export async function login(email, password) {
   try {
     const credentials = await signInWithEmailAndPassword(auth, email, password);
-    // Para obtener el token del usuario autenticado por Firebase Authentication:
+    
+    // Obtener el token del usuario autenticado
     const token = await credentials.user.getIdToken();
 
-    // Llamada al endpoint del backend para obtener el perfil del usuario autenticado
-    const response = await fetch("/api/auth/profile", {
-      method: "GET",
+    // Llamar al endpoint para obtener el UID
+    const response = await fetch(`${API_URL}/api/auth/uid`, {
+      method: 'GET',
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
     });
-    if (!response.ok) {
-      throw new Error(`Error al obtener perfil: ${response.statusText}`);
-    }
-    const userProfile = await response.json();
 
-    return credentials;
+    if (!response.ok) {
+      throw new Error('Error al obtener UID del usuario');
+    }
+
+    const data = await response.json();
+    if (data.success) {
+      console.log('UID del usuario:', data.uid);
+    }
+
+    return {
+      ...credentials,
+      uid: data.uid
+    };
 
   } catch (error) {
     console.log(error);
@@ -32,9 +44,9 @@ export async function login(email, password) {
     } else if (error.code === "auth/wrong-password") {
       message = "Contraseña incorrecta";
     } else if (error.code) {
-      message = "Error al inciar seción";
+      message = "Error al iniciar sesión";
     }
-    // Podrías lanzar el error o retornar el mensaje si lo necesitas
+    throw new Error(message || "Error al iniciar sesión");
   }
 };
 
