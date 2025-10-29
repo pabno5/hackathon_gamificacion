@@ -1,6 +1,8 @@
 import { auth } from "../config/firebase.config.js";
 import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
 export async function login(email, password) {
   try {
     const credentials = await signInWithEmailAndPassword(auth, email, password);
@@ -8,7 +10,7 @@ export async function login(email, password) {
     const token = await credentials.user.getIdToken();
 
     // Llamada al endpoint del backend para obtener el perfil del usuario autenticado
-    const response = await fetch("/api/auth/profile", {
+    const response = await fetch(`${API_URL}/auth/profile`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
