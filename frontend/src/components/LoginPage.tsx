@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Progress } from "./ui/progress";
 import { GeneratedHistoriaClinica } from "./GeneratedHistoriaClinica";
 import { SchedulingSection } from "./SchedulingSection";
-import { login, registerUser } from "../service/user.service"
+import { login, registerUser, logout } from "../service/user.service"
 
 interface LoginPageProps {
   onBack: () => void;
@@ -155,6 +155,16 @@ export function LoginPage({ onBack }: LoginPageProps) {
   const updateProgress = (increment: number, message: string) => {
     setProgress((prev) => Math.min(prev + increment, 100));
     setProgressMessage(message);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {
+      // noop
+    } finally {
+      onBack();
+    }
   };
 
   const handleSubmit = async(e: React.FormEvent) => {
@@ -667,7 +677,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
                       <Button 
                         variant="outline"
                         className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9] hover:text-white rounded-full px-6 transition-colors"
-                        onClick={onBack}
+                        onClick={handleLogout}
                       >
                         Cerrar sesión
                       </Button>
