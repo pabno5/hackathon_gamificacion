@@ -16,7 +16,7 @@ import { Progress } from "./ui/progress";
 import { GeneratedHistoriaClinica } from "./GeneratedHistoriaClinica";
 import { SchedulingSection } from "./SchedulingSection";
 import { login, registerUser, logout } from "../service/user.service"
-import { personasAPI } from "../service/api";
+import { personasAPI, historiasClinicasAPI } from "../service/api";
 
 interface LoginPageProps {
   onBack: () => void;
@@ -57,7 +57,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
     telefono: "",
     direccion: "",
     // Campos de servicio existentes en UI
-    tipoCita: "",
+    correoPaciente: "",
     sede: "",
     eps: "",
     especialidad: "",
@@ -323,69 +323,202 @@ export function LoginPage({ onBack }: LoginPageProps) {
     setIsSubmitting(true);
     setSubmitProgress(0);
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setSubmitProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsSubmitting(false);
-            updateProgress(10, "Cita agendada. Completando historia clínica...");
-            toast.success("Cita registrada. Ahora completa la historia clínica del paciente.");
-            
-            // Pre-fill some data from citas form
-            setHistoriaClinicaData({
-              ...historiaClinicaData,
-              nombreCompleto: `${citasFormData.nombres} ${citasFormData.apellidos}`,
-              documentoIdentidad: citasFormData.numero_documento,
-              telefono: citasFormData.telefono
-            });
-            
-            setCurrentView("historiaClinica");
-          }, 500);
-          return 100;
+    try {
+      toast.loading("Guardando datos del paciente...");
+      
+      // Paso 1: Buscar o crear el paciente
+      let pacienteId;
+      
+      try {
+        const pacienteResponse = await personasAPI.getByDocumento(citasFormData.numero_documento);
+        
+        if (pacienteResponse.data.success && pacienteResponse.data.data) {
+          // Paciente existe, usar su ID
+          pacienteId = pacienteResponse.data.data.id_persona;
+          toast.info("Paciente encontrado en el sistema");
         }
-        return prev + 10;
+      } catch (err: any) {
+        // Paciente no existe, crear uno nuevo
+        if (err.response?.status === 404) {
+          toast.loading("Creando nuevo paciente...");
+          const nuevoPaciente = await personasAPI.create({
+            tipo_documento: citasFormData.tipo_documento,
+            numero_documento: citasFormData.numero_documento,
+            nombres: citasFormData.nombres,
+            apellidos: citasFormData.apellidos,
+            fecha_nacimiento: citasFormData.fecha_nacimiento,
+            telefono: citasFormData.telefono,
+            direccion: citasFormData.direccion,
+            correo: citasFormData.correoPaciente
+          });
+          
+          if (nuevoPaciente.data.success && nuevoPaciente.data.data) {
+            pacienteId = nuevoPaciente.data.data.id_persona;
+            toast.success("Paciente creado exitosamente");
+          }
+        }
+      }
+      
+      if (!pacienteId) {
+        toast.dismiss();
+        toast.error("No se pudo crear o encontrar el paciente");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Si llegamos aquí, el paciente se guardó exitosamente (200)
+      toast.dismiss();
+      toast.success("Datos guardados correctamente. Ahora completa la historia clínica del paciente.");
+      updateProgress(10, "Paciente registrado. Completando historia clínica...");
+      
+      // Pre-fill some data from citas form
+      setHistoriaClinicaData({
+        ...historiaClinicaData,
+        nombreCompleto: `${citasFormData.nombres} ${citasFormData.apellidos}`,
+        documentoIdentidad: citasFormData.numero_documento,
+        telefono: citasFormData.telefono
       });
-    }, 200);
+      
+      setIsSubmitting(false);
+      setCurrentView("historiaClinica");
+      
+    } catch (error: any) {
+      toast.dismiss();
+      setIsSubmitting(false);
+      console.error("Error al guardar datos del paciente:", error);
+      toast.error(error.response?.data?.message || "Error al guardar los datos del paciente. Por favor intenta de nuevo.");
+    }
   };
 
   const handleHistoriaClinicaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProgress(100 - progress, "¡Historia clínica guardada exitosamente!");
-    toast.success("Historia clínica guardada correctamente en el sistema.");
     
-  // Reset forms
-  setCitasFormData({
-    // Backend-aligned fields
-    tipo_documento: "",
-    numero_documento: "",
-    nombres: "",
-    apellidos: "",
-    fecha_nacimiento: "",
-    telefono: "",
-    direccion: "",
-    // UI service fields
-    tipoCita: "",
-    sede: "",
-    eps: "",
-    especialidad: "",
-    acompanante: "",
-    archivos: null
-  });
-    
-    setFormSectionsCompleted({
-      basicInfo: false,
-      contactInfo: false,
-      serviceInfo: false,
-      filesUploaded: false
-    });
-    
-    setTimeout(() => {
-      setCurrentView("options");
-      setProgress(20);
-      setProgressMessage("Proceso completado. Listo para nueva cita");
-    }, 2000);
+    try {
+      toast.loading("Guardando historia clínica...");
+      
+      // Paso 1: Buscar o crear el paciente con los datos básicos
+      let pacienteId;
+      
+      try {
+        const pacienteResponse = await personasAPI.getByDocumento(historiaClinicaData.documentoIdentidad);
+        
+        if (pacienteResponse.data.success && pacienteResponse.data.data) {
+          // Paciente existe, usar su ID
+          pacienteId = pacienteResponse.data.data.id_persona;
+        }
+      } catch (err: any) {
+        // Paciente no existe, crear uno nuevo
+        if (err.response?.status === 404) {
+          const nuevoPaciente = await personasAPI.create({
+            tipo_documento: citasFormData.tipo_documento || "CC",
+            numero_documento: historiaClinicaData.documentoIdentidad,
+            nombres: historiaClinicaData.nombreCompleto.split(' ')[0] || "",
+            apellidos: historiaClinicaData.nombreCompleto.split(' ').slice(1).join(' ') || "",
+            fecha_nacimiento: historiaClinicaData.fechaNacimiento,
+            telefono: historiaClinicaData.telefono,
+            direccion: historiaClinicaData.direccion,
+            correo: correo
+          });
+          
+          if (nuevoPaciente.data.success && nuevoPaciente.data.data) {
+            pacienteId = nuevoPaciente.data.data.id_persona;
+          }
+        }
+      }
+      
+      if (!pacienteId) {
+        toast.dismiss();
+        toast.error("No se pudo crear o encontrar el paciente");
+        return;
+      }
+      
+      // Paso 2: Crear la historia clínica con solo los datos específicos (todos opcionales)
+      const historiaClinicaPayload = {
+        id_paciente: pacienteId,
+        motivo_consulta: historiaClinicaData.motivoConsulta,
+        enfermedad_actual: historiaClinicaData.enfermedadActual,
+        antecedentes_patologicos: historiaClinicaData.antecedentesPatologicos,
+        antecedentes_quirurgicos: historiaClinicaData.antecedentesQuirurgicos,
+        alergias: historiaClinicaData.alergias,
+        antecedentes_traumaticos: historiaClinicaData.antecedentesTraumaticos,
+        antecedentes_farmacologicos: historiaClinicaData.antecedentesFarmacologicos,
+        antecedentes_gineco_obstetricos: historiaClinicaData.antecedentesGinecoObstetricos,
+        habitos: historiaClinicaData.habitos,
+        antecedentes_familiares: historiaClinicaData.antecedentesFamiliares,
+        revision_general: historiaClinicaData.revisionGeneral,
+        revision_cardiovascular: historiaClinicaData.revisionCardiovascular,
+        revision_respiratorio: historiaClinicaData.revisionRespiratorio,
+        revision_digestivo: historiaClinicaData.revisionDigestivo,
+        revision_urinario: historiaClinicaData.revisionUrinario,
+        revision_nervioso: historiaClinicaData.revisionNervioso,
+        revision_musculo_esqueletico: historiaClinicaData.revisionMusculoEsqueletico,
+        revision_sensorial: historiaClinicaData.revisionSensorial,
+        tension_arterial: historiaClinicaData.tensionArterial,
+        frecuencia_cardiaca: historiaClinicaData.frecuenciaCardiaca,
+        frecuencia_respiratoria: historiaClinicaData.frecuenciaRespiratoria,
+        temperatura: historiaClinicaData.temperatura,
+        peso: historiaClinicaData.peso,
+        talla: historiaClinicaData.talla,
+        exploracion_sistemas: historiaClinicaData.exploracionSistemas,
+        agudeza_visual: historiaClinicaData.agudezaVisual,
+        fondo_ojo: historiaClinicaData.fondoOjo,
+        reflejos_pupilares: historiaClinicaData.reflejosPupilares,
+        diagnostico_principal: historiaClinicaData.diagnosticoPrincipal,
+        diagnostico_secundario: historiaClinicaData.diagnosticoSecundario,
+        medicamentos_recetados: historiaClinicaData.medicamentosRecetados,
+        indicaciones_paciente: historiaClinicaData.indicacionesPaciente,
+        recomendaciones: historiaClinicaData.recomendaciones,
+        interconsultas_examenes: historiaClinicaData.interconsultasExamenes,
+        evolucion_seguimiento: historiaClinicaData.evolucionSeguimiento
+      };
+
+      const response = await historiasClinicasAPI.create(historiaClinicaPayload);
+      
+      toast.dismiss();
+      
+      if (response.data.success) {
+        toast.success("Historia clínica guardada correctamente en el sistema.");
+        updateProgress(100 - progress, "¡Historia clínica guardada exitosamente!");
+        
+        // Reset forms
+        setCitasFormData({
+          // Backend-aligned fields
+          tipo_documento: "",
+          numero_documento: "",
+          nombres: "",
+          apellidos: "",
+          fecha_nacimiento: "",
+          telefono: "",
+          direccion: "",
+          // UI service fields
+          correoPaciente: "",
+          sede: "",
+          eps: "",
+          especialidad: "",
+          acompanante: "",
+          archivos: null
+        });
+        
+        setFormSectionsCompleted({
+          basicInfo: false,
+          contactInfo: false,
+          serviceInfo: false,
+          filesUploaded: false
+        });
+        
+        setTimeout(() => {
+          setCurrentView("options");
+          setProgress(20);
+          setProgressMessage("Proceso completado. Listo para nueva cita");
+        }, 2000);
+      } else {
+        toast.error("Error al guardar la historia clínica");
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      console.error("Error al guardar historia clínica:", error);
+      toast.error(error.response?.data?.message || "Error al guardar la historia clínica. Por favor intenta de nuevo.");
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -402,7 +535,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
   useEffect(() => {
     if (currentView === "citas") {
       // Check basic info
-      const basicInfoComplete = citasFormData.tipoCita && citasFormData.nombres && 
+      const basicInfoComplete = citasFormData.nombres && 
         citasFormData.apellidos && citasFormData.tipo_documento && citasFormData.numero_documento;
       
       if (basicInfoComplete && !formSectionsCompleted.basicInfo) {
@@ -411,7 +544,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
       }
 
       // Check contact info
-      const contactInfoComplete = correo && citasFormData.telefono;
+      const contactInfoComplete = citasFormData.correoPaciente && citasFormData.telefono;
       
       if (contactInfoComplete && !formSectionsCompleted.contactInfo && formSectionsCompleted.basicInfo) {
         updateProgress(10, "Información de contacto completada");
@@ -564,9 +697,11 @@ export function LoginPage({ onBack }: LoginPageProps) {
                       <SelectValue placeholder="Selecciona el tipo de documento" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cc">C.C.</SelectItem>
-                      <SelectItem value="ce">C.E.</SelectItem>
-                      <SelectItem value="dni">DNI extranjero</SelectItem>
+                      <SelectItem value="CC">C.C. - Cédula de Ciudadanía</SelectItem>
+                      <SelectItem value="TI">T.I. - Tarjeta de Identidad</SelectItem>
+                      <SelectItem value="CE">C.E. - Cédula de Extranjería</SelectItem>
+                      <SelectItem value="PAS">PAS - Pasaporte</SelectItem>
+                      <SelectItem value="NIT">NIT - Número de Identificación Tributaria</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1058,26 +1193,6 @@ export function LoginPage({ onBack }: LoginPageProps) {
                 {/* Form */}
                 <form onSubmit={handleCitasSubmit} className="bg-white rounded-3xl shadow-xl p-10">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Tipo de cita */}
-                    <div className="space-y-2">
-                      <Label htmlFor="tipoCita" className="text-gray-700">Tipo de cita*</Label>
-                      <Select 
-                        value={citasFormData.tipoCita} 
-                        onValueChange={(value) => setCitasFormData({...citasFormData, tipoCita: value})}
-                        required
-                      >
-                        <SelectTrigger className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl">
-                          <SelectValue placeholder="Selecciona el tipo de cita" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="consulta">Consulta general</SelectItem>
-                          <SelectItem value="control">Control</SelectItem>
-                          <SelectItem value="urgencia">Urgencia</SelectItem>
-                          <SelectItem value="cirugia">Cirugía</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
                     {/* Nombre del paciente */}
                     <div className="space-y-2">
                       <Label htmlFor="nombrePaciente" className="text-gray-700">Nombre del paciente*</Label>
@@ -1118,10 +1233,11 @@ export function LoginPage({ onBack }: LoginPageProps) {
                           <SelectValue placeholder="Selecciona el tipo de documento" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="cc">C.C.</SelectItem>
-                          <SelectItem value="ce">C.E.</SelectItem>
-                          <SelectItem value="ti">T.I.</SelectItem>
-                          <SelectItem value="pasaporte">Pasaporte</SelectItem>
+                          <SelectItem value="CC">C.C. - Cédula de Ciudadanía</SelectItem>
+                          <SelectItem value="TI">T.I. - Tarjeta de Identidad</SelectItem>
+                          <SelectItem value="CE">C.E. - Cédula de Extranjería</SelectItem>
+                          <SelectItem value="PAS">PAS - Pasaporte</SelectItem>
+                          <SelectItem value="NIT">NIT - Número de Identificación Tributaria</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1148,8 +1264,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         type="email"
                         placeholder="ejemplo@correo.com"
                         className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                        value={correo}
-                        onChange={(e) => setCorreo(e.target.value)}
+                        value={citasFormData.correoPaciente}
+                        onChange={(e) => setCitasFormData({...citasFormData, correoPaciente: e.target.value})}
                         required
                       />
                     </div>
@@ -1244,34 +1360,6 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         onChange={(e) => setCitasFormData({...citasFormData, acompanante: e.target.value})}
                         required
                       />
-                    </div>
-                  </div>
-
-                  {/* File Upload Section */}
-                  <div className="mt-8 pt-8 border-t border-gray-200">
-                    <Label className="text-gray-800 mb-4 block">
-                      Adjuntar autorizaciones y documentos de soporte*
-                    </Label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        id="fileUpload"
-                        multiple
-                        onChange={handleFileChange}
-                        className="hidden"
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      />
-                      <label
-                        htmlFor="fileUpload"
-                        className="flex items-center justify-center gap-3 w-full h-24 border-2 border-dashed border-[#03D4D9] rounded-xl cursor-pointer hover:bg-[#03D4D9]/5 transition-colors"
-                      >
-                        <Upload className="w-6 h-6 text-[#03D4D9]" />
-                        <span className="text-gray-700">
-                          {citasFormData.archivos && citasFormData.archivos.length > 0
-                            ? `${citasFormData.archivos.length} archivo(s) seleccionado(s)`
-                            : "Selecciona los archivos desde tu dispositivo"}
-                        </span>
-                      </label>
                     </div>
                   </div>
 

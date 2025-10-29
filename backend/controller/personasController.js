@@ -338,6 +338,8 @@ const getPersonaByDocumento = async (req, res) => {
       [numero_documento]
     );
 
+    console.log(result);
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
