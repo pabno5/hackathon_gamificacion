@@ -10,7 +10,7 @@ export async function login(email, password) {
     const token = await credentials.user.getIdToken();
 
     // Llamada al endpoint del backend para obtener el perfil del usuario autenticado
-    const response = await fetch(`${API_URL}/auth/profile`, {
+    const response = await fetch(`${API_URL}/auth/uid`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -22,7 +22,9 @@ export async function login(email, password) {
     }
     const userProfile = await response.json();
 
-    return credentials;
+    console.log(userProfile);
+
+    return userProfile;
 
   } catch (error) {
     console.log(error);
