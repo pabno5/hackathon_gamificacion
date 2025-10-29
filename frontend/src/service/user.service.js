@@ -17,14 +17,16 @@ export async function login(email, password) {
         "Content-Type": "application/json"
       }
     });
-    if (!response.ok) {
-      throw new Error(`Error al obtener perfil: ${response.statusText}`);
-    }
     const userProfile = await response.json();
 
     console.log(userProfile);
 
-    return userProfile;
+    if (userProfile.code === 200 && userProfile.success) {
+      return true;
+    }
+    if (userProfile.code === 404) {
+      return 'notRegister';
+    }
 
   } catch (error) {
     console.log(error);
@@ -44,4 +46,33 @@ export async function login(email, password) {
 
 export async function logout() {
   await signOut(auth);
+}
+
+// Registrar persona en backend usando el token actual de Firebase
+export async function registerUser(persona) {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No hay usuario autenticado');
+    }
+    const token = await user.getIdToken();
+
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(persona)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al registrar persona');
+    }
+    return data;
+  } catch (error) {
+    console.error('registerUser error:', error);
+    throw error;
+  }
 }

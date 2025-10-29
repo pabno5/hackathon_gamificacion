@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Progress } from "./ui/progress";
 import { GeneratedHistoriaClinica } from "./GeneratedHistoriaClinica";
 import { SchedulingSection } from "./SchedulingSection";
+import { login, registerUser } from "../service/user.service"
 
 interface LoginPageProps {
   onBack: () => void;
@@ -46,19 +47,26 @@ export function LoginPage({ onBack }: LoginPageProps) {
   });
   
   const [citasFormData, setCitasFormData] = useState({
+    // Datos alineados con backend
+    tipo_documento: "",
+    numero_documento: "",
+    nombres: "",
+    apellidos: "",
+    fecha_nacimiento: "",
+    telefono: "",
+    direccion: "",
+    // Campos de servicio existentes en UI
     tipoCita: "",
-    nombrePaciente: "",
-    apellidosPaciente: "",
-    tipoDocumento: "",
-    numeroDocumento: "",
-    correoElectronico: "",
-    telefonoContacto: "",
     sede: "",
     eps: "",
     especialidad: "",
     acompanante: "",
     archivos: null as File[] | null
   });
+
+  // Credenciales de acceso
+  const [correo, setCorreo] = useState("");
+  const [contrasena, setContrasena] = useState("");
 
   const [existingUserCedula, setExistingUserCedula] = useState("");
 
@@ -149,26 +157,69 @@ export function LoginPage({ onBack }: LoginPageProps) {
     setProgressMessage(message);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
     updateProgress(10, "Acceso exitoso al sistema");
-    setCurrentView("registration");
+
+    try {
+      const auth = await login(correo, contrasena);
+
+      if (auth == true) {
+        setCurrentView("options");
+      }
+      if (auth == 'notRegister') {
+        setCurrentView("registration");
+      }
+    } catch (err) {
+      console.log("Error iniciando sesión");
+    }
   };
 
-  const handleRegistrationSubmit = (e: React.FormEvent) => {
+  const handleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Registro completado correctamente");
-    setFormData({
-      documentType: "",
-      documentNumber: "",
-      firstName: "",
-      lastName: "",
-      birthDate: "",
-      phone: "",
-      address: ""
-    });
-    updateProgress(10, "Registro de empleado completado");
-    setCurrentView("options");
+    try {
+      // Mapear a los nombres que espera el backend
+      const payload = {
+        tipo_documento: formData.documentType,
+        numero_documento: formData.documentNumber,
+        nombres: formData.firstName,
+        apellidos: formData.lastName,
+        fecha_nacimiento: formData.birthDate,
+        telefono: formData.phone,
+        direccion: formData.address || null
+      };
+
+      await registerUser(payload);
+      toast.success("Registro completado correctamente");
+
+      // Prefill datos en formulario de citas
+      setCitasFormData({
+        ...citasFormData,
+        tipo_documento: payload.tipo_documento,
+        numero_documento: payload.numero_documento,
+        nombres: payload.nombres,
+        apellidos: payload.apellidos,
+        fecha_nacimiento: payload.fecha_nacimiento,
+        telefono: payload.telefono,
+        direccion: payload.direccion || "",
+      });
+      updateProgress(10, "Registro de empleado completado");
+      toast.info("Registro completado. Redirigiendo al menú principal");
+      setCurrentView("options");
+
+      setFormData({
+        documentType: "",
+        documentNumber: "",
+        firstName: "",
+        lastName: "",
+        birthDate: "",
+        phone: "",
+        address: ""
+      });
+    } catch (err) {
+      toast.error("No se pudo completar el registro");
+      console.error(err);
+    }
   };
 
   const handleBackToLogin = () => {
@@ -238,9 +289,9 @@ export function LoginPage({ onBack }: LoginPageProps) {
             // Pre-fill some data from citas form
             setHistoriaClinicaData({
               ...historiaClinicaData,
-              nombreCompleto: `${citasFormData.nombrePaciente} ${citasFormData.apellidosPaciente}`,
-              documentoIdentidad: citasFormData.numeroDocumento,
-              telefono: citasFormData.telefonoContacto
+              nombreCompleto: `${citasFormData.nombres} ${citasFormData.apellidos}`,
+              documentoIdentidad: citasFormData.numero_documento,
+              telefono: citasFormData.telefono
             });
             
             setCurrentView("historiaClinica");
@@ -257,21 +308,24 @@ export function LoginPage({ onBack }: LoginPageProps) {
     updateProgress(100 - progress, "¡Historia clínica guardada exitosamente!");
     toast.success("Historia clínica guardada correctamente en el sistema.");
     
-    // Reset forms
-    setCitasFormData({
-      tipoCita: "",
-      nombrePaciente: "",
-      apellidosPaciente: "",
-      tipoDocumento: "",
-      numeroDocumento: "",
-      correoElectronico: "",
-      telefonoContacto: "",
-      sede: "",
-      eps: "",
-      especialidad: "",
-      acompanante: "",
-      archivos: null
-    });
+  // Reset forms
+  setCitasFormData({
+    // Backend-aligned fields
+    tipo_documento: "",
+    numero_documento: "",
+    nombres: "",
+    apellidos: "",
+    fecha_nacimiento: "",
+    telefono: "",
+    direccion: "",
+    // UI service fields
+    tipoCita: "",
+    sede: "",
+    eps: "",
+    especialidad: "",
+    acompanante: "",
+    archivos: null
+  });
     
     setFormSectionsCompleted({
       basicInfo: false,
@@ -301,8 +355,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
   useEffect(() => {
     if (currentView === "citas") {
       // Check basic info
-      const basicInfoComplete = citasFormData.tipoCita && citasFormData.nombrePaciente && 
-        citasFormData.apellidosPaciente && citasFormData.tipoDocumento && citasFormData.numeroDocumento;
+      const basicInfoComplete = citasFormData.tipoCita && citasFormData.nombres && 
+        citasFormData.apellidos && citasFormData.tipo_documento && citasFormData.numero_documento;
       
       if (basicInfoComplete && !formSectionsCompleted.basicInfo) {
         updateProgress(10, "Información básica del paciente completada");
@@ -310,7 +364,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
       }
 
       // Check contact info
-      const contactInfoComplete = citasFormData.correoElectronico && citasFormData.telefonoContacto;
+      const contactInfoComplete = correo && citasFormData.telefono;
       
       if (contactInfoComplete && !formSectionsCompleted.contactInfo && formSectionsCompleted.basicInfo) {
         updateProgress(10, "Información de contacto completada");
@@ -366,13 +420,6 @@ export function LoginPage({ onBack }: LoginPageProps) {
                 />
               </div>
 
-              {/* Eye icon decoration */}
-              <div className="flex justify-center mb-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#01EDDF] to-[#03D4D9] rounded-full flex items-center justify-center shadow-lg">
-                  <Eye className="w-10 h-10 text-white" />
-                </div>
-              </div>
-
               {/* Title */}
               <div className="text-center mb-10">
                 <h1 className="text-gray-800 mb-3">Portal de Empleados</h1>
@@ -382,12 +429,14 @@ export function LoginPage({ onBack }: LoginPageProps) {
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-gray-700">Usuario</Label>
+                  <Label htmlFor="correo" className="text-gray-700">Correo</Label>
                   <Input 
-                    id="username"
-                    type="text"
-                    placeholder="Ingresa tu usuario"
+                    id="correo"
+                    type="email"
+                    placeholder="Ingresa tu correo"
                     className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
                     required
                   />
                 </div>
@@ -399,6 +448,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                     type="password"
                     placeholder="Ingresa tu contraseña"
                     className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                    value={contrasena}
+                    onChange={(e) => setContrasena(e.target.value)}
                     required
                   />
                 </div>
@@ -988,8 +1039,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         type="text"
                         placeholder="Ingresa el nombre"
                         className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                        value={citasFormData.nombrePaciente}
-                        onChange={(e) => setCitasFormData({...citasFormData, nombrePaciente: e.target.value})}
+                        value={citasFormData.nombres}
+                        onChange={(e) => setCitasFormData({...citasFormData, nombres: e.target.value})}
                         required
                       />
                     </div>
@@ -1002,8 +1053,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         type="text"
                         placeholder="Ingresa los apellidos"
                         className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                        value={citasFormData.apellidosPaciente}
-                        onChange={(e) => setCitasFormData({...citasFormData, apellidosPaciente: e.target.value})}
+                        value={citasFormData.apellidos}
+                        onChange={(e) => setCitasFormData({...citasFormData, apellidos: e.target.value})}
                         required
                       />
                     </div>
@@ -1012,8 +1063,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                     <div className="space-y-2">
                       <Label htmlFor="tipoDocumento" className="text-gray-700">Tipo de documento*</Label>
                       <Select 
-                        value={citasFormData.tipoDocumento} 
-                        onValueChange={(value) => setCitasFormData({...citasFormData, tipoDocumento: value})}
+                        value={citasFormData.tipo_documento} 
+                        onValueChange={(value) => setCitasFormData({...citasFormData, tipo_documento: value})}
                         required
                       >
                         <SelectTrigger className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl">
@@ -1036,8 +1087,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         type="text"
                         placeholder="Ingresa el número de documento"
                         className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                        value={citasFormData.numeroDocumento}
-                        onChange={(e) => setCitasFormData({...citasFormData, numeroDocumento: e.target.value})}
+                        value={citasFormData.numero_documento}
+                        onChange={(e) => setCitasFormData({...citasFormData, numero_documento: e.target.value})}
                         required
                       />
                     </div>
@@ -1050,8 +1101,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         type="email"
                         placeholder="ejemplo@correo.com"
                         className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                        value={citasFormData.correoElectronico}
-                        onChange={(e) => setCitasFormData({...citasFormData, correoElectronico: e.target.value})}
+                        value={correo}
+                        onChange={(e) => setCorreo(e.target.value)}
                         required
                       />
                     </div>
@@ -1064,8 +1115,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         type="tel"
                         placeholder="Ingresa el teléfono"
                         className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                        value={citasFormData.telefonoContacto}
-                        onChange={(e) => setCitasFormData({...citasFormData, telefonoContacto: e.target.value})}
+                        value={citasFormData.telefono}
+                        onChange={(e) => setCitasFormData({...citasFormData, telefono: e.target.value})}
                         required
                       />
                     </div>
