@@ -9,6 +9,7 @@ interface Message {
   text: string;
   sender: "bot" | "user";
   timestamp: Date;
+  fuente?: string; // 📄 Manual | 💡 Recomendación general
 }
 
 const quickOptions = [
@@ -28,31 +29,62 @@ export function AppointmentChatSection() {
     }
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSendMessage = (text: string) => {
-    if (!text.trim()) return;
+  // 🚀 Enviar mensaje al backend FastAPI
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim() || loading) return;
 
-    // Add user message
     const userMessage: Message = {
       id: messages.length + 1,
-      text: text,
+      text,
       sender: "user",
       timestamp: new Date()
     };
-    setMessages(prev => [...prev, userMessage]);
-
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse: Message = {
-        id: messages.length + 2,
-        text: "Perfecto! Para agendar tu cita, por favor contáctanos al (601) 123-4567 o escríbenos por WhatsApp. Nuestro horario de atención es de lunes a viernes de 8:00 AM a 6:00 PM.",
-        sender: "bot",
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botResponse]);
-    }, 1000);
-
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
+    setLoading(true);
+
+    try {
+      // Llamada al backend (ajusta la URL si lo despliegas)
+      const res = await fetch("http://localhost:8000/buscar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: text })
+      });
+
+      const data = await res.json();
+
+      const fuenteEtiqueta =
+        data.fuente === "pdf"
+          ? "📄 Basado en el manual"
+          : data.fuente === "conocimiento_general"
+          ? "💡 Recomendación general"
+          : "⚙️ Respuesta automática";
+
+      const botMessage: Message = {
+        id: messages.length + 2,
+        text: data.respuesta || "Lo siento, no pude procesar tu consulta.",
+        sender: "bot",
+        timestamp: new Date(),
+        fuente: fuenteEtiqueta
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error("Error al conectar con el backend:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messages.length + 2,
+          text: "⚠️ No se pudo conectar con el servidor. Verifica que el backend esté activo.",
+          sender: "bot",
+          timestamp: new Date()
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleQuickOption = (option: string) => {
@@ -72,6 +104,7 @@ export function AppointmentChatSection() {
 
         <div className="max-w-4xl mx-auto">
           <div className="bg-gradient-to-br from-gray-50 to-[#01EDDF]/5 rounded-3xl shadow-xl overflow-hidden border border-gray-200">
+            
             {/* Chat Header */}
             <div className="bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] p-6">
               <div className="flex items-center gap-4">
@@ -113,12 +146,20 @@ export function AppointmentChatSection() {
                           : "bg-white border border-gray-200 text-gray-800"
                       }`}
                     >
-                      <p className={message.sender === "user" ? "text-white" : "text-gray-800"}>
-                        {message.text}
-                      </p>
-                      <p className={`text-xs mt-1 ${
-                        message.sender === "user" ? "text-white/80" : "text-gray-500"
-                      }`}>
+                      <p>{message.text}</p>
+
+                      {/* 🏷️ Fuente de información */}
+                      {message.sender === "bot" && message.fuente && (
+                        <p className="text-xs mt-1 text-gray-500">{message.fuente}</p>
+                      )}
+
+                      <p
+                        className={`text-xs mt-1 ${
+                          message.sender === "user"
+                            ? "text-white/80"
+                            : "text-gray-400"
+                        }`}
+                      >
                         {message.timestamp.toLocaleTimeString("es-ES", {
                           hour: "2-digit",
                           minute: "2-digit"
@@ -128,6 +169,13 @@ export function AppointmentChatSection() {
                   </div>
                 </div>
               ))}
+
+              {/* Estado de escritura */}
+              {loading && (
+                <div className="text-gray-400 text-sm italic">
+                  Cardenitas está escribiendo...
+                </div>
+              )}
             </div>
 
             {/* Quick Options */}
@@ -153,21 +201,21 @@ export function AppointmentChatSection() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      handleSendMessage(inputValue);
-                    }
+                    if (e.key === "Enter") handleSendMessage(inputValue);
                   }}
                   placeholder="Escribe tu mensaje..."
                   className="flex-1 rounded-full border-gray-300 focus:border-[#03D4D9] focus:ring-[#03D4D9]"
                 />
                 <Button
                   onClick={() => handleSendMessage(inputValue)}
+                  disabled={loading}
                   className="bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:opacity-90 text-white rounded-full px-6"
                 >
                   <Send className="w-5 h-5" />
                 </Button>
               </div>
             </div>
+
           </div>
         </div>
       </div>
