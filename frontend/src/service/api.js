@@ -117,5 +117,12 @@ export const rolesAPI = {
   delete: (id) => api.delete(`/roles/${id}`),
 };
 
+// ============ HISTORIAS CLÍNICAS ============
+export const historiasClinicasAPI = {
+  create: (data) => api.post('/historias-clinicas', data),
+  getByPaciente: (id_paciente) => api.get(`/historias-clinicas/paciente/${id_paciente}`),
+  getById: (id) => api.get(`/historias-clinicas/${id}`),
+};
+
 export default api;
 

@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Eye } from 'lucide-react';
 import { login } from '../service/user.service.js';
-import logo from '../assets/2b3771565ef8277b6c0f14cb804efe3e5eeb11aa.png';
+import logo from '../assets/logo.png';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -179,4 +179,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

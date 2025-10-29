@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import image1 from "figma:asset/cda12ece160b21947d9650aba927cfd4197c57ba.png";
-import image2 from "figma:asset/6c501743924c167a065891faff596b76e0bb3a89.png";
-import image3 from "figma:asset/ff1e6d366e21d85ea85c6111243559274f0ec1dc.png";
+import image1 from "../assets/image1.jpg";
+import image2 from "../assets/image2.jpg"
+import image3 from "../assets/image3.jpg";
 
 const slides = [
   {
