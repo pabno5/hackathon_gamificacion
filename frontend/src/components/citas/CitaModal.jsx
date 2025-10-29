@@ -167,10 +167,16 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
       }));
     }
 
-    // Convertir fecha a ISO string para el backend
+    // Enviar fecha tal como está (sin conversión a UTC)
+    // El formato datetime-local ya está en formato ISO: "2025-10-29T14:07"
+    // Agregamos ":00" para los segundos si no están
+    const fechaFormateada = formData.fecha_cita.length === 16 
+      ? `${formData.fecha_cita}:00` 
+      : formData.fecha_cita;
+
     const dataToSend = {
       ...formData,
-      fecha_cita: new Date(formData.fecha_cita).toISOString(),
+      fecha_cita: fechaFormateada,
     };
 
     // Pasar datos y archivo al parent component

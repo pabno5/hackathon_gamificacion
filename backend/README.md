@@ -225,12 +225,91 @@ fetch('http://localhost:3000/api/personas', {
 })
 ```
 
+## 🔌 Integración con Google Calendar
+
+El sistema puede sincronizarse con Google Calendar para gestionar citas automáticamente.
+
+### Configuración Rápida
+
+1. **Obtén credenciales de Google Cloud**:
+   - Ve a [Google Cloud Console](https://console.cloud.google.com/)
+   - Crea una Service Account
+   - Descarga las credenciales JSON
+
+2. **Guarda las credenciales**:
+   ```bash
+   # Coloca el archivo en:
+   backend/credentials/google-calendar-credentials.json
+   ```
+
+3. **Configura tu `.env`**:
+   ```env
+   GOOGLE_CALENDAR_CREDENTIALS_PATH=./credentials/google-calendar-credentials.json
+   GOOGLE_CALENDAR_ID=tu_email@gmail.com
+   TIMEZONE=America/Bogota
+   ```
+
+4. **Prueba la configuración**:
+   ```bash
+   node test-google-calendar.js
+   ```
+
+### Scripts Útiles
+
+#### 1. **Test de Google Calendar**
+Verifica que las credenciales funcionen correctamente:
+
+```bash
+node test-google-calendar.js
+```
+
+Resultado:
+- ✅ Valida las credenciales
+- ✅ Prueba la conexión con Google Calendar API
+- ✅ Lista eventos del calendario
+- ✅ Muestra errores específicos con soluciones
+
+#### 2. **Convertir Credenciales a Variable de Entorno**
+Convierte un archivo JSON de credenciales a formato de variable de entorno:
+
+```bash
+node convert-credentials-to-env.js ruta/al/archivo.json
+```
+
+Ejemplo:
+```bash
+node convert-credentials-to-env.js ./credentials/google-calendar-credentials.json
+node convert-credentials-to-env.js C:/Downloads/mi-proyecto-123456.json
+```
+
+Resultado:
+- ✅ Valida que el JSON sea correcto
+- ✅ Convierte a formato de una línea
+- ✅ Te da el texto listo para copiar en `.env`
+
+### Solución de Problemas con Google Calendar
+
+Si encuentras el error **"Invalid JWT Signature"**:
+
+```bash
+# Lee la guía completa de solución
+cat SOLUCIONAR_ERROR_GOOGLE_CALENDAR.md
+
+# O prueba las credenciales
+node test-google-calendar.js
+```
+
+📖 **Guía detallada**: `SOLUCIONAR_ERROR_GOOGLE_CALENDAR.md`
+
+---
+
 ## 📚 Documentación Adicional
 
 - `SUPABASE_SETUP.txt` - Configuración completa de Supabase
 - `EJEMPLO_REGISTRO_LOGIN.txt` - Ejemplos de uso de la API
 - `ARQUITECTURA_FINAL.txt` - Diagrama de arquitectura
 - `RESUMEN_CAMBIOS.txt` - Historial de cambios
+- `SOLUCIONAR_ERROR_GOOGLE_CALENDAR.md` - Guía de solución para Google Calendar
 
 ## 🧪 Testing
 
