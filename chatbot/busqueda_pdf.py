@@ -185,7 +185,6 @@ Respuesta corta:
         # Fallback: devolver los resúmenes originales
         return "\n".join([f"• {row['resumen']}" for _, row in resultados.iterrows()])
 
-
 # ==============================
 # 🚀 API FASTAPI
 # ==============================
