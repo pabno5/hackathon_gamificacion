@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { ArrowLeft, Calendar, Check, X, MessageCircle, Mail } from "lucide-react";
+import { ArrowLeft, Calendar, Check, X, MessageCircle, MessageSquare, Mail } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner@2.0.3";
 import logoImage from "../assets/logo.png";
@@ -311,7 +311,7 @@ export function SchedulingSection({
             </motion.div>
 
             {/* Action Buttons */}
-            <div className="grid md:grid-cols-2 gap-4 mt-8">
+            <div className="grid md:grid-cols-3 gap-4 mt-8">
               <Button
                 onClick={() => {
                   toast.success("Enviando confirmación por WhatsApp...");
@@ -329,6 +329,15 @@ export function SchedulingSection({
               >
                 <Mail className="w-5 h-5 mr-2" />
                 Enviar por correo
+              </Button>
+              <Button
+                onClick={() => {
+                  /* Sin funcionalidad: botón placeholder para enviar por SMS */
+                }}
+                className="h-16 bg-white text-gray-800 border border-gray-200 hover:bg-gray-50 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                <MessageSquare className="w-5 h-5 mr-2 text-gray-800" />
+                Enviar por SMS
               </Button>
             </div>
 
