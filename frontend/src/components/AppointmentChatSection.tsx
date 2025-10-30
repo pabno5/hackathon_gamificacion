@@ -12,10 +12,17 @@ interface Message {
 }
 
 const quickOptions = [
+<<<<<<< Updated upstream
   "Agendar consulta oftalmológica",
   "Agendar examen de optometría",
   "Cirugía de cataratas",
   "Consultar horarios disponibles",
+=======
+  "como puedo agendar una cita",
+  "cuales son los servicios disponibles",
+  "cuantas sedes tiene cárdenas visión",
+  "cuales son las especialidades medicas de cardenas vision"
+>>>>>>> Stashed changes
 ];
 
 export function AppointmentChatSection() {

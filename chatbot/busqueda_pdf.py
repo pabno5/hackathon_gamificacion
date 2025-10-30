@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import sqlite3
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # ← IMPORTAR CORS
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import uuid
@@ -20,9 +20,9 @@ from langchain_ollama import OllamaEmbeddings
 # 🧩 CONFIGURACIÓN
 # ==============================
 
-PDF_PATH = "./documentos/Protocolos Call Center Salud Oftalmología.pdf"
+PDF_PATH = "./documentos/Organización Información Cárdenas Visión Boyacá.pdf"
 DB_PATH = "documentos.db"
-EMBED_MODEL = "mxbai-embed-large:latest"
+EMBED_MODEL = "embeddinggemma:latest"
 OLLAMA_MODEL = "mistral"
 UMBRAL_RELEVANCIA = 1.5  # Distancia máxima para considerar un resultado relevante
 
@@ -40,7 +40,7 @@ def extraer_texto_pdf(pdf_path):
     for page in reader.pages:
         texto += page.extract_text() + "\n"
     # dividir en fragmentos manejables
-    chunks = [texto[i:i + 1000] for i in range(0, len(texto), 1000)]
+    chunks = [texto[i:i + 800] for i in range(0, len(texto), 800)]
     return chunks
 
 
@@ -56,27 +56,23 @@ def cargar_o_generar_resumenes():
 
         def resumir_texto(fragmento):
             prompt = f"""
-Eres un asistente experto en protocolos de call center de salud oftalmológica. 
-Analiza el siguiente texto y crea un resumen conversacional que:
-
-- EXPLIQUE el concepto principal en términos naturales
-- MENCIONE el propósito o objetivo clave
-- DESTAQUE información práctica relevante
-- Use un lenguaje fluido y cotidiano
-- Evite repeticiones y frases robóticas
-- Sea útil para alguien que trabaja en el call center
+Analiza el siguiente texto de protocolos de call center de salud oftalmológica y extrae la información más importante de manera CONCRETA y DIRECTA.
 
 Texto original:
 {fragmento}
 
-Ejemplos de estilo BUENO:
-"Para las cirugías programadas, lo principal es que el equipo verifica las órdenes médicas y coordina toda la atención con el paciente, asegurándose de que todo esté listo para el procedimiento."
+Resumen CONCRETO (máximo 3-4 líneas):
+- Extrae solo los puntos clave, procedimientos específicos, pasos a seguir
+- Usa lenguaje claro y directo
+- Evita explicaciones largas o lenguaje florido
+- Enfócate en lo que el agente del call center necesita SABER o HACER
 
-"Cuando un paciente llama con emergencias, el protocolo indica primero calmar a la persona, luego clasificar la urgencia según estos síntomas específicos, y finalmente derivar al especialista correspondiente."
+Ejemplo de estilo CONCRETO:
+"Verificar órdenes médicas antes de programar cirugía. Confirmar disponibilidad del quirófano. Contactar paciente 48h antes para confirmar asistencia."
 
-"En la gestión de citas, hay que confirmar la asistencia 48 horas antes, verificar que traigan todos los estudios requeridos, y explicarles claramente los preparativos necesarios."
+"En emergencias: calmar al paciente, identificar síntomas críticos (dolor intenso, pérdida de visión), derivar inmediatamente al especialista."
 
-Ahora escribe tu resumen conversacional:
+Resumen concreto:
 """
             response = ollama.generate(model=OLLAMA_MODEL, prompt=prompt)
             return response["response"].strip()
@@ -119,10 +115,9 @@ index.add(embedded_docs)
 # 🔎 BÚSQUEDA Y RESPUESTA MEJORADA
 # ==============================
 
-def buscar_y_responder(query, k=5):
+def buscar_y_responder(query, k=7):
     """
-    Búsqueda semántica que devuelve UNA respuesta única.
-    Primero busca en el PDF, si no encuentra info relevante, usa conocimiento general.
+    Búsqueda semántica que devuelve respuestas concretas basadas estrictamente en el PDF.
     """
     
     # 1. Búsqueda semántica
@@ -137,64 +132,64 @@ def buscar_y_responder(query, k=5):
             idx = indices[0][i]
             resultados_relevantes.append({
                 'resumen': data.iloc[idx]['resumen'],
+                'fragmento': data.iloc[idx]['fragmento'],
                 'distancia': float(dist)
             })
     
-    # 3. Generar respuesta única
+    # 3. Generar respuesta CONCRETA basada en la información encontrada
     if resultados_relevantes:
-        # HAY información relevante en el PDF
-        contextos = "\n\n".join([f"- {r['resumen']}" for r in resultados_relevantes[:3]])
+        # Ordenar por relevancia (menor distancia = más relevante)
+        resultados_relevantes.sort(key=lambda x: x['distancia'])
+        
+        # Tomar los 2-3 más relevantes
+        contextos = "\n\n".join([f"Información {i+1}: {r['resumen']}" for i, r in enumerate(resultados_relevantes[:3])])
         
         prompt = f"""
-Eres un asistente de call center de salud oftalmológica. Un usuario pregunta:
-"{query}"
+Eres un asistente especializado en protocolos de call center de salud oftalmológica.
 
-Basándote ÚNICAMENTE en esta información del manual:
+Consulta del usuario: "{query}"
+
+Información CONCRETA encontrada en los protocolos:
 {contextos}
 
-Genera UNA respuesta clara y concisa que:
-- Sea directa y específica (2-4 líneas máximo)
-- Use lenguaje natural y fluido
-- NO copies textualmente del documento
-- Integre la información de forma coherente
-- Si hay varios pasos, enuméralos brevemente
+INSTRUCCIONES ESTRICTAS:
+1. Responde ÚNICAMENTE con la información proporcionada para esta consulta  "{query}"
+2. Sé específico y concreto - menciona pasos, procedimientos, requisitos exactos
+3. Si hay procedimientos específicos, enuméralos claramente
+4. NO inventes información que no esté en los protocolos
+5. NO uses frases como "según el protocolo" o "de acuerdo al documento" - solo da la información directa
+6. Si la información es insuficiente, di específicamente qué falta
 
-Respuesta:
+Respuesta concreta:
 """
         
         fuente = "pdf"
         
     else:
-        # NO hay información relevante, usar conocimiento general
-        prompt = f"""
-Eres un asistente de call center de salud oftalmológica. Un usuario pregunta:
-"{query}"
-
-No encontraste información específica en el manual de protocolos, así que responde basándote en:
-- Mejores prácticas de atención al cliente en salud
-- Procedimientos estándar de call centers médicos
-- Tu conocimiento general sobre oftalmología
-
-Genera UNA respuesta útil y profesional que:
-- Sea práctica y aplicable
-- Tenga 2-4 líneas
-- Mencione que es una recomendación general (ya que no está en el manual)
-
-Respuesta:
-"""
-        
-        fuente = "conocimiento_general"
+        # NO hay información relevante - ser específico sobre lo que falta
+        return {
+            "respuesta": "No encontré información específica sobre este tema en los protocolos del call center de oftalmología. Por favor consulta con tu supervisor o revisa los manuales actualizados.",
+            "fuente": "no_encontrado",
+            "resultados_encontrados": 0,
+            "detalles": []
+        }
     
     # 4. Generar respuesta
     try:
         respuesta_llm = ollama.generate(
             model=OLLAMA_MODEL,
             prompt=prompt,
-            options={'temperature': 0.4, 'num_predict': 200}
+            options={'temperature': 0.1, 'num_predict': 200}  # Temperatura más baja = más consistente
         )
         respuesta_final = respuesta_llm["response"].strip()
+        
+        # Verificar que la respuesta no sea genérica
+        palabras_vacias = ["lo siento", "no tengo", "no encuentro", "no está", "no aparece"]
+        if any(palabra in respuesta_final.lower() for palabra in palabras_vacias):
+            respuesta_final = "La información en los protocolos no es suficientemente específica para esta consulta. Se recomienda contactar al supervisor para procedimientos detallados."
+            
     except Exception as e:
-        respuesta_final = "Lo siento, hubo un error al procesar tu consulta. ¿Podrías reformularla?"
+        respuesta_final = "Error al procesar la consulta. Por favor reformula tu pregunta."
         fuente = "error"
     
     return {
@@ -211,10 +206,9 @@ Respuesta:
 
 app = FastAPI()
 
-# ← CONFIGURAR CORS AQUÍ
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, especifica los dominios exactos
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -261,15 +255,15 @@ if __name__ == "__main__":
             
             # Indicador de fuente
             if resultado['fuente'] == 'pdf':
-                print(f"   📄 [Basado en el manual - {resultado['resultados_encontrados']} referencias]")
-            elif resultado['fuente'] == 'conocimiento_general':
-                print(f"   💡 [Recomendación general - no encontrado en el manual]")
+                print(f"   📄 [Información basada en protocolos - {resultado['resultados_encontrados']} referencias encontradas]")
+            elif resultado['fuente'] == 'no_encontrado':
+                print(f"   ⚠️  [No encontrado en protocolos - consultar con supervisor]")
             
             print("-" * 60)
             
             # Opcional: ver detalles
             if resultado['detalles']:
-                mostrar = input("\n¿Ver fragmentos del manual? (s/n): ").strip().lower()
+                mostrar = input("\n¿Ver detalles técnicos? (s/n): ").strip().lower()
                 if mostrar == 's':
                     print("\n📋 Fragmentos relevantes:")
                     for i, det in enumerate(resultado['detalles'][:3], 1):
