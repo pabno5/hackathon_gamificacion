@@ -243,6 +243,7 @@ export function SchedulingSection({
               >
                 <Button
                   onClick={() => setShowConfirmation(true)}
+                  data-progress-id="confirmar-agendamiento"
                   className="h-16 px-12 bg-gradient-to-r from-[#038996] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl"
                 >
                   <Check className="w-6 h-6 mr-2" />
@@ -316,6 +317,7 @@ export function SchedulingSection({
                 onClick={() => {
                   toast.success("Enviando confirmación por WhatsApp...");
                 }}
+                data-progress-id="enviar-whatsapp"
                 className="h-16 bg-[#25D366] hover:bg-[#20BD5C] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 <MessageCircle className="w-5 h-5 mr-2" />
@@ -325,12 +327,14 @@ export function SchedulingSection({
                 onClick={() => {
                   toast.success("Enviando confirmación por correo electrónico...");
                 }}
+                data-progress-id="enviar-correo"
                 className="h-16 bg-gradient-to-r from-[#038996] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 <Mail className="w-5 h-5 mr-2" />
                 Enviar por correo
               </Button>
               <Button
+                data-progress-id="enviar-sms"
                 onClick={() => {
                   /* Sin funcionalidad: botón placeholder para enviar por SMS */
                 }}
@@ -346,6 +350,7 @@ export function SchedulingSection({
               <Button
                 onClick={onBackToMenu}
                 variant="outline"
+                data-progress-id="volver-menu"
                 className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9] hover:text-white rounded-xl px-8 py-4"
               >
                 Volver al Menú Principal

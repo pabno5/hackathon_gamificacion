@@ -56,7 +56,7 @@ export function ChatBot() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
-            className="fixed bottom-32 right-6 w-96 bg-white rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col"
+              className="fixed bottom-32 right-6 w-96 bg-white rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col chat-window"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-[#03D4D9] to-[#01EDDF] p-4 text-white flex items-center justify-between">
@@ -83,18 +83,18 @@ export function ChatBot() {
                   className={`flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`p-3 rounded-2xl max-w-[80%] text-sm shadow ${
-                      msg.from === "user"
-                        ? "bg-[#03D4D9] text-white rounded-br-none"
-                        : "bg-white text-gray-800 rounded-bl-none"
-                    }`}
+                      className={`p-3 rounded-2xl max-w-[80%] text-sm shadow ${
+                        msg.from === "user"
+                          ? "user-bubble bg-[#03D4D9] text-white rounded-br-none"
+                          : "bot-bubble bg-white text-gray-800 rounded-bl-none"
+                      }`}
                   >
                     {msg.text}
                   </div>
                 </div>
               ))}
               {loading && (
-                <div className="text-gray-400 text-xs italic">Cardenitas está escribiendo...</div>
+                  <div className="typing-indicator text-gray-400 text-xs italic">Cardenitas está escribiendo...</div>
               )}
             </div>
 

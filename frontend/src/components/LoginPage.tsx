@@ -13,6 +13,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner@2.0.3";
 import { motion, AnimatePresence } from "motion/react";
 import { Progress } from "./ui/progress";
+import { initProgressTracker, registerButton, notifyClick } from "../lib/progressTracker";
 import { GeneratedHistoriaClinica } from "./GeneratedHistoriaClinica";
 import { SchedulingSection } from "./SchedulingSection";
 import { login, registerUser, logout } from "../service/user.service"
@@ -173,6 +174,29 @@ export function LoginPage({ onBack }: LoginPageProps) {
     }
   };
 
+  // Initialize progress tracker per user (use correo as user key) and listen for updates
+  useEffect(() => {
+    try {
+      initProgressTracker(correo || 'guest');
+    } catch (e) {
+      // noop
+    }
+
+    const handler = (e: any) => {
+      const detail = e?.detail;
+      if (detail && typeof detail.percent === 'number') {
+        setProgress(detail.percent);
+      }
+    };
+
+    window.addEventListener('progressTracker:update', handler as EventListener);
+
+    // cleanup
+    return () => {
+      window.removeEventListener('progressTracker:update', handler as EventListener);
+    };
+  }, [correo]);
+
   const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
     updateProgress(10, "Acceso exitoso al sistema");
@@ -251,14 +275,23 @@ export function LoginPage({ onBack }: LoginPageProps) {
   };
 
   const handleOptionClick = (option: string) => {
+    const id = `option-${option.toLowerCase()}`;
+    // notify the tracker (will only count the first click per user)
+    try { notifyClick(id); } catch (e) { /* noop */ }
+
     if (option === "Citas") {
-      updateProgress(15, "Sección de citas seleccionada");
       setCurrentView("userTypeSelection");
     } else {
-      updateProgress(5, `Sección ${option} consultada`);
       toast.success(`Has seleccionado: ${option}`);
     }
   };
+
+  // Register the main options so the tracker knows the total count
+  useEffect(() => {
+    ["Citas", "Exámenes", "Especialidades", "Laboratorios"].forEach((opt) => {
+      try { registerButton(`option-${opt.toLowerCase()}`); } catch (e) { /* noop */ }
+    });
+  }, []);
 
   const handleUserTypeSelection = (type: "new" | "existing") => {
     if (type === "existing") {
@@ -1368,8 +1401,9 @@ export function LoginPage({ onBack }: LoginPageProps) {
                     <Button
                       type="button"
                       variant="outline"
+                      data-progress-id="adres"
                       className="border-2 border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9] hover:text-white rounded-xl px-8 py-6 transition-colors mb-2"
-                      onClick={() => toast.info("Redirigiendo al sistema ADRES para consultar la EPS del paciente...")}
+                        onClick={() => toast.info("Redirigiendo al sistema ADRES para consultar la EPS del paciente...")}
                     >
                       ADRES
                     </Button>
@@ -1380,6 +1414,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
                   <div className="mt-8">
                     <Button 
                       type="submit"
+                      data-progress-id="citas-submit"
                       disabled={isSubmitting}
                       className="w-full h-14 bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                     >
@@ -2221,7 +2256,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
       </div>
 
       {/* Fixed Progress Bar at Bottom - Shown in multiple views */}
-      {(currentView === "options" || currentView === "userTypeSelection" || currentView === "existingUserForm" || currentView === "citas" || currentView === "historiaClinica" || currentView === "generarHistoria") && progress > 0 && (
+  {(currentView === "options" || currentView === "userTypeSelection" || currentView === "existingUserForm" || currentView === "citas" || currentView === "historiaClinica" || currentView === "generarHistoria") && progress > 0 && progress < 100 && (
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

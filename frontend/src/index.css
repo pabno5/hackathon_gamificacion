@@ -397,6 +397,56 @@
     color: var(--foreground);
   }
 
+  /* High contrast mode overrides */
+  body.high-contrast {
+    background-color: #000 !important;
+    color: #ffff00 !important; /* yellow text on black background */
+    filter: none !important;
+  }
+
+  body.high-contrast a { color: #ffff00 !important; }
+  body.high-contrast img { opacity: 0.95; }
+  body.high-contrast button { background-color: #000 !important; color: #ffff00 !important; border-color: #ffff00 !important; }
+  body.high-contrast .bg-white { background-color: #000 !important; }
+  body.high-contrast .text-white { color: #ffff00 !important; }
+  body.high-contrast .bg-[#01EDDF], body.high-contrast .bg-[#03D4D9], body.high-contrast .bg-[#038996], body.high-contrast .bg-[#25D366] {
+    background-color: #000 !important;
+  }
+
+  /* Small adjustments for the floating toggle */
+  .contrast-toggle {
+    background: linear-gradient(180deg, #fff 0%, #f1f1f1 100%);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+
+  body.high-contrast .contrast-toggle {
+    background: #ffff00 !important;
+    color: #000 !important;
+    border: 2px solid #000 !important;
+  }
+
+  /* Chat bubbles in high contrast */
+  body.high-contrast .chat-window .bot-bubble,
+  body.high-contrast .appointment-chat .bot-bubble {
+    background-color: #000 !important;
+    color: #ffffff !important;
+    border-color: #ffffff !important;
+  }
+
+  body.high-contrast .chat-window .bot-bubble p,
+  body.high-contrast .appointment-chat .bot-bubble p,
+  body.high-contrast .chat-window .typing-indicator,
+  body.high-contrast .appointment-chat .typing-indicator,
+  body.high-contrast .appointment-chat .text-white,
+  body.high-contrast .appointment-chat .text-white\/90 {
+    color: #ffffff !important;
+  }
+
+  body.high-contrast .appointment-chat .user-bubble {
+    /* keep user bubbles readable */
+    filter: none !important;
+  }
+
   :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) h1 {
     font-size: var(--text-2xl);
     font-weight: var(--font-weight-medium);

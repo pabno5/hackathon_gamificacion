@@ -10,12 +10,15 @@ import { Footer } from "./components/Footer";
 import { LoginPage } from "./components/LoginPage";
 import { Toaster } from "./components/ui/sonner";
 import CalendarioPage from "./pages/CalendarioPage";
+import ContrastToggle from "./components/ContrastToggle";
 
 function HomePage() {
   const navigate = useNavigate();
   
   return (
     <div className="min-h-screen">
+      {/* Contrast toggle only on the main home page */}
+      <ContrastToggle />
       <Navbar 
         onLoginClick={() => navigate("/login")}
         onAgendarClick={() => navigate("/calendario")}

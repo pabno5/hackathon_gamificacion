@@ -3,6 +3,7 @@ import { Slot } from "@radix-ui/react-slot@1.1.2";
 import { cva, type VariantProps } from "class-variance-authority@0.7.1";
 
 import { cn } from "./utils";
+import { registerButton, notifyClick } from "../../lib/progressTracker";
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
@@ -39,17 +40,44 @@ function Button({
   variant,
   size,
   asChild = false,
+  onClick,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    // allow data-progress-id through props
   }) {
   const Comp = asChild ? Slot : "button";
+
+  // Read data-progress-id if provided
+  const progressId = (props as any)["data-progress-id"] as string | undefined;
+
+  React.useEffect(() => {
+    if (progressId) {
+      try {
+        registerButton(progressId);
+      } catch (e) {
+        // noop
+      }
+    }
+  }, [progressId]);
+
+  const handleClick = (e: any) => {
+    if (progressId) {
+      try {
+        notifyClick(progressId);
+      } catch (err) {
+        // noop
+      }
+    }
+    if (onClick) onClick(e);
+  };
 
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      onClick={handleClick}
       {...props}
     />
   );
