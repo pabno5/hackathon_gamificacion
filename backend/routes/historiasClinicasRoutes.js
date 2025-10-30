@@ -10,10 +10,10 @@ const { verifyToken } = require('../utils/authMiddleware');
 // Crear historia clínica (requiere autenticación)
 router.post('/', verifyToken, createHistoriaClinica);
 
-// Obtener historias clínicas por ID de paciente
-router.get('/paciente/:id_paciente', verifyToken, getHistoriasClinicasByPaciente);
+// Obtener historias clínicas por ID de paciente (temporalmente sin autenticación)
+router.get('/paciente/:id_paciente', getHistoriasClinicasByPaciente);
 
-// Obtener historia clínica por ID
-router.get('/:id', verifyToken, getHistoriaClinicaById);
+// Obtener historia clínica por ID (temporalmente sin autenticación)
+router.get('/:id', getHistoriaClinicaById);
 
 module.exports = router;

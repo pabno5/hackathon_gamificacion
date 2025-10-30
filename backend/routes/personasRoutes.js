@@ -6,7 +6,8 @@ const {
   getPersonaById,
   updatePersona,
   deletePersona,
-  getPersonaByDocumento
+  getPersonaByDocumento,
+  getPersonaByUID
 } = require('../controller/personasController');
 const { verifyToken, verifyAdminOrEmployee } = require('../utils/authMiddleware');
 
@@ -16,6 +17,8 @@ const { verifyToken, verifyAdminOrEmployee } = require('../utils/authMiddleware'
 
 // Rutas específicas (deben ir antes de las rutas con parámetros)
 router.get('/documento/:numero_documento', getPersonaByDocumento);
+// Obtener persona del usuario autenticado
+router.get('/me', verifyToken, getPersonaByUID);
 
 // CRUD de personas
 router.post('/', createPersona); // verifyAdminOrEmployee deshabilitado temporalmente

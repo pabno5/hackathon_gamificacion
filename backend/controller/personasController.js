@@ -367,5 +367,24 @@ module.exports = {
   getPersonaById,
   updatePersona,
   deletePersona,
-  getPersonaByDocumento
+  getPersonaByDocumento,
+  // Agregado: obtener persona del usuario autenticado por UID
+  getPersonaByUID: async (req, res) => {
+    try {
+      const uid = req.user?.uid;
+      if (!uid) {
+        return res.status(401).json({ success: false, message: 'No autenticado' });
+      }
+
+      const result = await query('SELECT * FROM personas WHERE uid = $1', [uid]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Persona no encontrada' });
+      }
+
+      return res.status(200).json({ success: true, data: result.rows[0] });
+    } catch (error) {
+      console.error('Error al obtener persona por UID:', error);
+      return res.status(500).json({ success: false, message: 'Error al obtener persona', error: error.message });
+    }
+  }
 };

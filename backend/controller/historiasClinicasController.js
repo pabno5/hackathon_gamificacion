@@ -4,42 +4,7 @@ const { query } = require('../config/dataconnect');
 const createHistoriaClinica = async (req, res) => {
   try {
     const {
-      id_paciente,
-      motivo_consulta,
-      enfermedad_actual,
-      antecedentes_patologicos,
-      antecedentes_quirurgicos,
-      alergias,
-      antecedentes_traumaticos,
-      antecedentes_farmacologicos,
-      antecedentes_gineco_obstetricos,
-      habitos,
-      antecedentes_familiares,
-      revision_general,
-      revision_cardiovascular,
-      revision_respiratorio,
-      revision_digestivo,
-      revision_urinario,
-      revision_nervioso,
-      revision_musculo_esqueletico,
-      revision_sensorial,
-      tension_arterial,
-      frecuencia_cardiaca,
-      frecuencia_respiratoria,
-      temperatura,
-      peso,
-      talla,
-      exploracion_sistemas,
-      agudeza_visual,
-      fondo_ojo,
-      reflejos_pupilares,
-      diagnostico_principal,
-      diagnostico_secundario,
-      medicamentos_recetados,
-      indicaciones_paciente,
-      recomendaciones,
-      interconsultas_examenes,
-      evolucion_seguimiento
+ hist
     } = req.body;
 
     // Validaciones
@@ -156,7 +121,7 @@ const getHistoriasClinicasByPaciente = async (req, res) => {
       `SELECT 
         hc.*, 
         p.nombres, p.apellidos, p.tipo_documento, p.numero_documento,
-        p.fecha_nacimiento, p.sexo, p.direccion, p.telefono
+        p.fecha_nacimiento, p.direccion, p.telefono
        FROM historias_clinicas hc
        JOIN personas p ON hc.id_paciente = p.id_persona
        WHERE hc.id_paciente = $1
@@ -188,7 +153,7 @@ const getHistoriaClinicaById = async (req, res) => {
       `SELECT 
         hc.*, 
         p.nombres, p.apellidos, p.tipo_documento, p.numero_documento,
-        p.fecha_nacimiento, p.sexo, p.direccion, p.telefono
+        p.fecha_nacimiento, p.direccion, p.telefono
        FROM historias_clinicas hc
        JOIN personas p ON hc.id_paciente = p.id_persona
        WHERE hc.id_historia_clinica = $1`,
