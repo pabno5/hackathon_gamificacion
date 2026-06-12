@@ -10,6 +10,7 @@ import { Footer } from "./components/Footer";
 import { LoginPage } from "./components/LoginPage";
 import { Toaster } from "./components/ui/sonner";
 import CalendarioPage from "./pages/CalendarioPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ContrastToggle from "./components/ContrastToggle";
 
 function HomePage() {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPageWrapper />} />
         <Route path="/calendario" element={<CalendarioPage />} />
+        <Route path="/admin" element={<AdminDashboardPage />} />
       </Routes>
       <Toaster />
     </Router>

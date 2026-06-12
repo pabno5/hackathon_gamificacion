@@ -19,7 +19,8 @@ export function ChatBot() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/buscar", {
+      const CHATBOT = (import.meta as any).env?.VITE_CHATBOT_URL || "http://localhost:8000";
+      const res = await fetch(`${CHATBOT}/buscar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: input })

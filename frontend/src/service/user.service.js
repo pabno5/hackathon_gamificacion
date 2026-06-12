@@ -1,83 +1,78 @@
-import { auth } from "../config/firebase.config.js";
-import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+/**
+ * Auth contra Supabase. Firmas conservadas para compatibilidad con LoginPage:
+ *   - login(email, password)  -> true | 'notRegister' | undefined
+ *   - logout()                -> void
+ *   - registerUser(persona)   -> { success, data }
+ */
+import { supabase } from '../lib/supabaseClient';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = API_BASE.replace(/\/api$/, '/api/v1');
 
-export async function login(email, password) {
-  try {
-    const credentials = await signInWithEmailAndPassword(auth, email, password);
-    // Para obtener el token del usuario autenticado por Firebase Authentication:
-    const token = await credentials.user.getIdToken();
-
-    // Guardar el token en localStorage para usar en las peticiones del API
-    localStorage.setItem('authToken', token);
-
-    // Llamada al endpoint del backend para obtener el perfil del usuario autenticado
-    const response = await fetch(`${API_URL}/auth/uid`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      }
-    });
-    const userProfile = await response.json();
-
-    console.log(userProfile);
-
-    if (userProfile.code === 200 && userProfile.success) {
-      return true;
-    }
-    if (userProfile.code === 404) {
-      return 'notRegister';
-    }
-
-  } catch (error) {
-    console.log(error);
-    let message;
-    if (error.code === "auth/user-not-found") {
-      message = "Correo no registrado";
-    } else if (error.code === "auth/invalid-credential") {
-      message = "Correo o contraseña incorrectos";
-    } else if (error.code === "auth/wrong-password") {
-      message = "Contraseña incorrecta";
-    } else if (error.code) {
-      message = "Error al inciar seción";
-    }
-    // Podrías lanzar el error o retornar el mensaje si lo necesitas
-  }
-};
-
-export async function logout() {
-  await signOut(auth);
-  // Limpiar el token del localStorage al cerrar sesión
+function setToken(token) {
+  if (token) localStorage.setItem('authToken', token);
+}
+function clearToken() {
   localStorage.removeItem('authToken');
 }
 
-// Registrar persona en backend usando el token actual de Firebase
-export async function registerUser(persona) {
+export async function login(email, password) {
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No hay usuario autenticado');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      const code = (error.message || '').toLowerCase();
+      console.warn('Login error:', error.message);
+      if (code.includes('invalid login')) return undefined;
+      return undefined;
     }
-    const token = await user.getIdToken();
+    const token = data.session?.access_token;
+    if (!token) return undefined;
+    setToken(token);
 
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(persona)
+    // Validar que el usuario tenga empleado vinculado
+    const resp = await fetch(`${API_URL}/auth/uid`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.message || 'Error al registrar persona');
-    }
-    return data;
-  } catch (error) {
-    console.error('registerUser error:', error);
-    throw error;
+    const body = await resp.json().catch(() => ({}));
+    if (body?.code === 200 && body?.success) return true;
+    if (body?.code === 404) return 'notRegister';
+    return undefined;
+  } catch (e) {
+    console.error('login fatal:', e);
+    return undefined;
   }
+}
+
+export async function logout() {
+  try {
+    await supabase.auth.signOut();
+  } finally {
+    clearToken();
+  }
+}
+
+export async function registerUser(persona) {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) throw new Error('No hay sesión activa');
+
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(persona),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || 'Error al registrar persona');
+  return data;
+}
+
+// Helper para que `api.js` lea el JWT vigente de Supabase si localStorage está vacío.
+export async function getCurrentToken() {
+  const cached = localStorage.getItem('authToken');
+  if (cached) return cached;
+  const { data } = await supabase.auth.getSession();
+  const t = data.session?.access_token || null;
+  if (t) setToken(t);
+  return t;
 }

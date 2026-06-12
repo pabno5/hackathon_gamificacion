@@ -12,17 +12,10 @@ interface Message {
 }
 
 const quickOptions = [
-<<<<<<< Updated upstream
-  "Agendar consulta oftalmológica",
-  "Agendar examen de optometría",
-  "Cirugía de cataratas",
-  "Consultar horarios disponibles",
-=======
-  "como puedo agendar una cita",
-  "cuales son los servicios disponibles",
-  "cuantas sedes tiene cárdenas visión",
-  "cuales son las especialidades medicas de cardenas vision"
->>>>>>> Stashed changes
+  "¿Cómo puedo agendar una cita?",
+  "¿Cuáles son los servicios disponibles?",
+  "¿Cuántas sedes tiene Cárdenas Visión?",
+  "¿Cuáles son las especialidades médicas?",
 ];
 
 export function AppointmentChatSection() {
@@ -53,7 +46,8 @@ export function AppointmentChatSection() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/buscar", {
+      const CHATBOT = (import.meta as any).env?.VITE_CHATBOT_URL || "http://localhost:8000";
+      const res = await fetch(`${CHATBOT}/buscar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: text }),

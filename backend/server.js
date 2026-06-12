@@ -3,130 +3,124 @@ const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 
-// Importar rutas
-const authRoutes = require('./routes/authRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const personasRoutes = require('./routes/personasRoutes');
-const medicosRoutes = require('./routes/medicosRoutes');
-const rolesRoutes = require('./routes/rolesRoutes');
-const credencialesRoutes = require('./routes/credencialesRoutes');
-const especialidadesRoutes = require('./routes/especialidadesRoutes');
-const documentosRoutes = require('./routes/documentosRoutes');
-const historiasClinicasRoutes = require('./routes/historiasClinicasRoutes');
-
 dotenv.config();
+
+// Módulos
+const createAuthRouter = require('./src/modules/auth/auth.routes');
+const createPacientesModule = require('./src/modules/pacientes');
+const createHistoriasModule = require('./src/modules/historias-clinicas');
+const createEspecialidadesModule = require('./src/modules/especialidades');
+const createSedesModule = require('./src/modules/sedes');
+const createMedicosModule = require('./src/modules/medicos');
+const createEmpleadosModule = require('./src/modules/empleados');
+const createCitasModule = require('./src/modules/citas');
+const createGamificacionModule = require('./src/modules/gamificacion');
+const createAuditModule = require('./src/modules/audit');
+
+// Shared / infrastructure
+const errorHandler = require('./src/shared/middleware/errorHandler.middleware');
+const { generalRateLimit } = require('./src/shared/middleware/rateLimit.middleware');
+const eventBus = require('./src/shared/events/eventBus');
+const { registerCalendarListeners } = require('./src/infrastructure/calendarListeners');
+const calendarCron = require('./src/infrastructure/calendarCron');
+const { getPool } = require('./src/infrastructure/db');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares
-// CORS - Permitir peticiones desde el frontend
+app.set('trust proxy', 1);
+
+// 1. CORS
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3001', 'http://localhost:4173'];
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3001'],
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use(bodyParser.json()); // Para parsear JSON
-app.use(bodyParser.urlencoded({ extended: true }));
+// 2. Security headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// 3. Body parsing
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// 4. Rate limit global
+app.use(generalRateLimit);
+
+// 5. Estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rutas
-app.get('/', (req, res) => {
-  res.send('¡Servidor funcionando correctamente con Supabase + Firebase Auth!');
+// Health
+app.get('/', (_req, res) => {
+  res.send('Servidor Clínica Cárdenas Visión — Supabase Auth + PostgreSQL');
 });
 
-// Ruta de prueba para verificar la conexión
-app.get('/test-connection', async (req, res) => {
+app.get('/test-connection', async (_req, res) => {
   try {
-    const { query, admin } = require('./config/dataconnect');
-
-    // Verificar conexión a PostgreSQL
-    const result = await query('SELECT NOW() as now, version() as version');
-    const dbTime = result.rows[0];
-
-    // Verificar que Firebase Admin esté inicializado
-    const firebaseApp = admin.app();
-
+    const pool = getPool();
+    const result = await pool.query('SELECT NOW() as now, version() as version');
     res.json({
       success: true,
       database: {
         status: 'Conectado a Supabase PostgreSQL',
-        serverTime: dbTime.now,
-        version: dbTime.version
+        serverTime: result.rows[0].now,
+        version: result.rows[0].version,
       },
-      firebase: {
-        status: 'Firebase Auth inicializado',
-        projectId: firebaseApp.options.projectId
-      },
-      message: '¡Conexión establecida exitosamente!'
+      auth: { provider: 'Supabase Auth' },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      details: {
-        name: error.name,
-        code: error.code
-      }
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Rutas de autenticación
-app.use('/api/auth', authRoutes);
+// 6. Routes — /api/v1
+app.use('/api/v1/auth', createAuthRouter());
+app.use('/api/v1/pacientes', createPacientesModule());
+app.use('/api/v1/historias-clinicas', createHistoriasModule());
+app.use('/api/v1/especialidades', createEspecialidadesModule());
+app.use('/api/v1/sedes', createSedesModule());
+app.use('/api/v1/medicos', createMedicosModule());
+app.use('/api/v1/empleados', createEmpleadosModule());
+app.use('/api/v1/gamificacion', createGamificacionModule());
+app.use('/api/v1/audit', createAuditModule());
 
-// Rutas de administrador (requieren rol de administrador)
-app.use('/api/admin', adminRoutes);
+// Citas: módulo expone repo para listeners de Calendar
+const citasModule = createCitasModule();
+app.use('/api/v1/citas', citasModule.router);
+registerCalendarListeners(citasModule.repo);
 
-// Rutas de personas
-app.use('/api/personas', personasRoutes);
+// Stats del cron de Calendar
+app.get('/api/v1/calendar/sync-stats', (_req, res) => res.json(calendarCron.getStats()));
 
-// Rutas de médicos
-app.use('/api/medicos', medicosRoutes);
-
-// Rutas de roles
-app.use('/api/roles', rolesRoutes);
-
-// Rutas de credenciales (autenticación)
-app.use('/api/credenciales', credencialesRoutes);
-
-// Rutas de especialidades
-app.use('/api/especialidades', especialidadesRoutes);
-
-// Rutas de documentos
-app.use('/api/documentos', documentosRoutes);
-
-// Rutas de historias clínicas
-app.use('/api/historias-clinicas', historiasClinicasRoutes);
-
-// Rutas de citas
-const citasRoutes = require('./routes/citas');
-app.use('/api/citas', citasRoutes);
-
-// Ruta para ver estadísticas de sincronización
-const calendarSyncService = require('./services/calendarSyncService');
-app.get('/api/calendar/sync-stats', (req, res) => {
-  res.json(calendarSyncService.getStats());
+// 7. EventBus listeners
+eventBus.onSafe('tour.completado', ({ idEmpleado }) => {
+  console.log(`[event] tour.completado idEmpleado=${idEmpleado}`);
 });
 
-// Iniciar servidor
+// 8. Error handler global
+app.use(errorHandler);
+
 app.listen(PORT, () => {
   console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
   console.log(`🔧 Modo: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Test conexión: http://localhost:${PORT}/test-connection`);
-  
-  // Iniciar sincronización automática de Google Calendar
-  // Configuración desde .env o por defecto cada 15 minutos
+  console.log(`🌐 CORS origins: ${corsOrigins.join(', ')}`);
+
   const syncInterval = process.env.GOOGLE_CALENDAR_SYNC_INTERVAL || '*/15 * * * *';
-  
   if (process.env.GOOGLE_CALENDAR_AUTO_SYNC !== 'false') {
-    calendarSyncService.start(syncInterval);
+    calendarCron.start(syncInterval);
   } else {
-    console.log('⚠️  Sincronización automática de Google Calendar deshabilitada (GOOGLE_CALENDAR_AUTO_SYNC=false)');
+    console.log('⚠️  Sincronización Google Calendar deshabilitada');
   }
 });
 

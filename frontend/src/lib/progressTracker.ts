@@ -1,77 +1,178 @@
-type Stored = {
-  clickedIds: string[];
+/**
+ * Tracker de progreso de gamificación — respaldado por backend (GAM-06).
+ *
+ * Mantiene la firma legacy (initProgressTracker, registerButton, notifyClick,
+ * getProgressInfo) para no tocar LoginPage/button.tsx, pero el estado vive en BD:
+ *   - init: carga GET /gamificacion/mi-progreso
+ *   - click de un botón mapeado a feature: POST /gamificacion/visitar
+ *   - sin sesión backend (visitante/landing): cae a modo local (localStorage)
+ *
+ * El evento `progressTracker:update` se mantiene — la barra de progreso
+ * existente sigue funcionando sin cambios.
+ */
+
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
+const API_V1 = API_URL.replace(/\/api$/, '/api/v1');
+
+// Mapa: id de botón legacy → código de feature de BD.
+// Botones cuyo id YA es un código (R-01, M-03, A-07) pasan directo.
+const BUTTON_TO_FEATURE: Record<string, string> = {
+  'option-citas': 'R-04',
+  'option-historia clinica': 'R-08',
+  'option-generar historia': 'M-04',
 };
 
+const FEATURE_CODE_RE = /^[RMA]-\d{2}$/;
+
+type Resumen = { total: number; visitadas: number; porcentaje: number };
+
+let backendMode = false;
+let resumen: Resumen | null = null;
+
+// Estado local (fallback sin sesión)
 let userKey = 'guest';
 let clicked = new Set<string>();
 let registered = new Set<string>();
 
 const storageKey = (u: string) => `buttonProgress:${u}`;
 
-function loadForUser(u: string) {
+function getToken(): string | null {
+  try {
+    return localStorage.getItem('authToken');
+  } catch {
+    return null;
+  }
+}
+
+function featureCodeFor(id: string): string | null {
+  if (FEATURE_CODE_RE.test(id)) return id;
+  return BUTTON_TO_FEATURE[id] || null;
+}
+
+function loadLocal(u: string) {
   userKey = u || 'guest';
   clicked = new Set<string>();
   try {
     const raw = localStorage.getItem(storageKey(userKey));
-    if (raw) {
-      const parsed: Stored = JSON.parse(raw);
-      parsed.clickedIds?.forEach((id) => clicked.add(id));
-    }
-  } catch (e) {
-    // noop
+    if (raw) JSON.parse(raw).clickedIds?.forEach((id: string) => clicked.add(id));
+  } catch {
+    /* noop */
   }
 }
 
-function persist() {
+function persistLocal() {
   try {
-    const payload: Stored = { clickedIds: Array.from(clicked) };
-    localStorage.setItem(storageKey(userKey), JSON.stringify(payload));
-  } catch (e) {
-    // noop
+    localStorage.setItem(storageKey(userKey), JSON.stringify({ clickedIds: Array.from(clicked) }));
+  } catch {
+    /* noop */
+  }
+}
+
+async function fetchResumen(): Promise<Resumen | null> {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${API_V1}/gamificacion/mi-progreso`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body?.data?.resumen ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function postVisitar(codigo: string): Promise<Resumen | null> {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${API_V1}/gamificacion/visitar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo }),
+    });
+    if (!res.ok) return null; // 403 = feature de otro rol; ignorar
+    const body = await res.json();
+    return body?.data ?? null;
+  } catch {
+    return null;
   }
 }
 
 export function initProgressTracker(forUserKey?: string) {
-  loadForUser(forUserKey || 'guest');
-  // notify initial state
+  loadLocal(forUserKey || 'guest');
+  // Intentar modo backend
+  fetchResumen().then((r) => {
+    if (r) {
+      backendMode = true;
+      resumen = r;
+    }
+    dispatchUpdate();
+  });
   dispatchUpdate();
 }
 
 export function registerButton(id: string) {
   if (!id) return;
   registered.add(id);
-  // update listeners with new total
   dispatchUpdate();
 }
 
 export function notifyClick(id: string) {
   if (!id) return;
-  if (!registered.has(id)) {
-    // ensure it's registered so totals include it
-    registered.add(id);
+  registered.add(id);
+
+  // Backend: mapear a feature y persistir en BD
+  const codigo = featureCodeFor(id);
+  if (codigo && getToken()) {
+    postVisitar(codigo).then((r) => {
+      if (r) {
+        backendMode = true;
+        resumen = r;
+        dispatchUpdate();
+      }
+    });
   }
+
+  // Local siempre (UX inmediata + fallback)
   if (!clicked.has(id)) {
     clicked.add(id);
-    persist();
+    persistLocal();
     dispatchUpdate();
   }
 }
 
 export function getProgressInfo() {
+  if (backendMode && resumen) {
+    return {
+      total: resumen.total,
+      clickedCount: resumen.visitadas,
+      percent: resumen.porcentaje,
+      clicked: Array.from(clicked),
+    };
+  }
   const total = registered.size;
   const clickedCount = clicked.size;
   const percent = total > 0 ? Math.round((clickedCount / total) * 100) : 0;
   return { total, clickedCount, percent, clicked: Array.from(clicked) };
 }
 
+/** Fuerza recarga del resumen desde backend (p.ej. tras login). */
+export async function refreshProgress() {
+  const r = await fetchResumen();
+  if (r) {
+    backendMode = true;
+    resumen = r;
+    dispatchUpdate();
+  }
+}
+
 function dispatchUpdate() {
-  const info = getProgressInfo();
-  // Dispatch a custom event on window
   try {
-    const ev = new CustomEvent('progressTracker:update', { detail: info });
-    window.dispatchEvent(ev);
-  } catch (e) {
-    // fallback: no-op
+    window.dispatchEvent(new CustomEvent('progressTracker:update', { detail: getProgressInfo() }));
+  } catch {
+    /* noop */
   }
 }
 
@@ -81,6 +182,8 @@ export function resetForUser(u?: string) {
   if (k === userKey) {
     clicked.clear();
     registered.clear();
+    backendMode = false;
+    resumen = null;
     dispatchUpdate();
   }
 }
@@ -90,5 +193,6 @@ export default {
   registerButton,
   notifyClick,
   getProgressInfo,
+  refreshProgress,
   resetForUser,
 };

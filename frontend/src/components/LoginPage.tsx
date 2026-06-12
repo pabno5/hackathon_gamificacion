@@ -13,7 +13,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner@2.0.3";
 import { motion, AnimatePresence } from "motion/react";
 import { Progress } from "./ui/progress";
-import { initProgressTracker, registerButton, notifyClick } from "../lib/progressTracker";
+import { initProgressTracker, registerButton, notifyClick, refreshProgress } from "../lib/progressTracker";
+import { startTourIfFirstLogin } from "../lib/tourManager";
 import { GeneratedHistoriaClinica } from "./GeneratedHistoriaClinica";
 import { SchedulingSection } from "./SchedulingSection";
 import { login, registerUser, logout } from "../service/user.service"
@@ -206,6 +207,10 @@ export function LoginPage({ onBack }: LoginPageProps) {
 
       if (auth == true) {
         setCurrentView("options");
+        // Cargar progreso real desde BD y lanzar tour si es primer login.
+        // setTimeout deja que la vista "options" monte antes de resaltar elementos.
+        refreshProgress();
+        setTimeout(() => { startTourIfFirstLogin(); }, 600);
       }
       if (auth == 'notRegister') {
         setCurrentView("registration");
