@@ -13,6 +13,7 @@ import CalendarioPage from "./pages/CalendarioPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ContrastToggle from "./components/ContrastToggle";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "./lib/authContext";
 
 function HomePage() {
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ function LoginPageWrapper() {
 export default function App() {
   return (
     <Router>
+      <AuthProvider>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPageWrapper />} />
@@ -66,6 +68,7 @@ export default function App() {
         />
       </Routes>
       <Toaster />
+      </AuthProvider>
     </Router>
   );
 }

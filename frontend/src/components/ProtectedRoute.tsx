@@ -1,17 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { supabase } from "../lib/supabaseClient";
-import { authAPI } from "../service/api";
+import { useAuth } from "../lib/authContext";
 
 /**
- * Guard de rutas del portal (NF-01 + restricción de agendamiento del PRD).
- *
- * - Sin sesión Supabase → redirige a /login.
- * - `roles` opcional: si se pasa, exige que el rol del empleado esté en la lista;
- *   si no, redirige a /login con aviso.
- *
- * Mientras verifica muestra un placeholder para no exponer la vista protegida.
+ * Guard de rutas del portal. Lee el rol de useAuth (una sola carga de perfil).
+ * - Sin rol (sin sesión o perfil inválido) → /login.
+ * - `roles` presente y el rol no está → /portal (ya logueado, va a su home).
  */
 export default function ProtectedRoute({
   children,
@@ -21,53 +16,29 @@ export default function ProtectedRoute({
   roles?: string[];
 }) {
   const navigate = useNavigate();
-  const [estado, setEstado] = useState<"verificando" | "ok">("verificando");
+  const { rol, loading } = useAuth();
 
   useEffect(() => {
-    let activo = true;
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        if (activo) {
-          toast.error("Debes iniciar sesión");
-          navigate("/login");
-        }
-        return;
-      }
-      // Si se exige rol, validarlo contra el backend.
-      if (roles && roles.length > 0) {
-        try {
-          const { data: perfil } = await authAPI.profile();
-          const rol = perfil?.data?.rol;
-          if (!rol || !roles.includes(rol)) {
-            if (activo) {
-              toast.error("No tienes permisos para acceder a esta sección");
-              navigate("/login");
-            }
-            return;
-          }
-        } catch {
-          if (activo) {
-            toast.error("Sesión inválida");
-            navigate("/login");
-          }
-          return;
-        }
-      }
-      if (activo) setEstado("ok");
-    })();
-    return () => {
-      activo = false;
-    };
-  }, [navigate, roles]);
+    if (loading) return;
+    if (!rol) {
+      toast.error("Debes iniciar sesión");
+      navigate("/login");
+      return;
+    }
+    if (roles && roles.length > 0 && !roles.includes(rol)) {
+      toast.error("No tienes permisos para esta sección");
+      navigate("/portal");
+    }
+  }, [loading, rol, roles, navigate]);
 
-  if (estado === "verificando") {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-gray-500">Verificando acceso…</div>
       </div>
     );
   }
-
+  if (!rol) return null;
+  if (roles && roles.length > 0 && !roles.includes(rol)) return null;
   return <>{children}</>;
 }
