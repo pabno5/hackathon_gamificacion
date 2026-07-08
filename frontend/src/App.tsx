@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Navbar } from "./components/Navbar";
 import { HeroSlider } from "./components/HeroSlider";
 import { ServicesSection } from "./components/ServicesSection";
@@ -13,7 +13,8 @@ import CalendarioPage from "./pages/CalendarioPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ContrastToggle from "./components/ContrastToggle";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { AuthProvider } from "./lib/authContext";
+import PortalLayout from "./components/portal/PortalLayout";
+import { AuthProvider, useAuth } from "./lib/authContext";
 
 function HomePage() {
   const navigate = useNavigate();
@@ -43,6 +44,22 @@ function LoginPageWrapper() {
   return <LoginPage onBack={() => navigate("/")} />;
 }
 
+// Home por rol. En Inc 1 solo existen dashboard y agenda, así que médico y
+// recepción van a agenda; el mapa final (recepción→citas) llega en Inc 2/3.
+function PortalIndexRedirect() {
+  const { rol, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500">Verificando acceso…</div>
+      </div>
+    );
+  }
+  if (rol === "admin") return <Navigate to="/portal/dashboard" replace />;
+  if (rol === "medico" || rol === "recepcionista") return <Navigate to="/portal/agenda" replace />;
+  return <Navigate to="/login" replace />;
+}
+
 export default function App() {
   return (
     <Router>
@@ -50,22 +67,31 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPageWrapper />} />
+
+        {/* Portal de empleados: shell + rutas por rol */}
         <Route
-          path="/calendario"
+          path="/portal"
           element={
             <ProtectedRoute>
-              <CalendarioPage />
+              <PortalLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute roles={["admin"]}>
-              <AdminDashboardPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<PortalIndexRedirect />} />
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="agenda" element={<CalendarioPage />} />
+        </Route>
+
+        {/* Compat: rutas viejas redirigen a las nuevas */}
+        <Route path="/admin" element={<Navigate to="/portal/dashboard" replace />} />
+        <Route path="/calendario" element={<Navigate to="/portal/agenda" replace />} />
       </Routes>
       <Toaster />
       </AuthProvider>
