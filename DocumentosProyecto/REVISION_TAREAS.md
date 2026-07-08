@@ -26,8 +26,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
   *Pendiente — requiere primero partir el portal por rol (FT-04); sin vistas por rol no hay dónde anclar la mayoría de los pasos.*
 - [ ] **FE-03** Tracking por clicks: solo 3 de 22 features mapeadas.
   *Pendiente — depende de FT-04 (los elementos por rol aún no existen).*
-- [ ] **FE-04** Portal sin distinción de roles.
-  *Pendiente — cambio grande sobre el monolito (FT-04).*
+- [~] **FE-04** Portal sin distinción de roles.
+  *Inc 1 de FT-04 hecho: `PortalLayout` + `PortalNav` por rol, rutas `/portal/*`, dashboard y agenda bajo el shell con guards. Falta migrar citas/historia del monolito (Inc 2+).*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).
   *`App.tsx`. Nota: el botón "Agendar" del Navbar público ahora rebota a login — considerar cambiar su destino a la sección de contacto (decisión UX del dueño).*
 - [ ] **FE-06** UI recuperar contraseña (AU-03): endpoint existe, front solo `console.log`.
@@ -70,8 +70,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 - [x] **FT-02** `ProtectedRoute` creado y aplicado a `/calendario` y `/admin`.
 - [~] **FT-03** Suite de tests: arrancada con `node --test` (sin deps nuevas). 6 tests pasando.
   *Cubre filtro de campos HC (HC-05) y tour.factory. Falta: choque de citas, auth middleware (necesitan mocks de DB).*
-- [ ] **FT-04** Partir monolito LoginPage (2300+ líneas) en rutas por rol.
-  *Pendiente — precondición de FE-02/03/04/06. Es el trabajo grande que desbloquea el resto del frontend.*
+- [~] **FT-04** Partir monolito LoginPage (2300+ líneas) en rutas por rol.
+  *Inc 1/5 hecho (fundación): AuthContext, PortalLayout, PortalNav por rol, rutas `/portal/*`, redirects de compat. Spec + plan en `2026-07-08-portal-split-*`. Incrementos 2-5 pendientes (extraer login, migrar citas/historia/pacientes).*
 - [x] **FT-05** JWT: interceptor usa token vigente de Supabase; localStorage se sincroniza en cada refresh.
   *`api.js`, `supabaseClient.ts`.*
 
