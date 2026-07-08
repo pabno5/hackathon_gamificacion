@@ -1,11 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
-import { gamificacionAPI, empleadosAPI, authAPI } from "../service/api";
+import { gamificacionAPI, empleadosAPI } from "../service/api";
 import { supabase } from "../lib/supabaseClient";
-import { logout } from "../service/user.service";
-import logoImage from "../assets/logo.png";
 
 type Resumen = {
   id_empleado: string;
@@ -54,33 +51,12 @@ function formatDate(iso: string | null) {
 }
 
 export default function AdminDashboardPage() {
-  const navigate = useNavigate();
   const [resumen, setResumen] = useState<Resumen[]>([]);
   const [loading, setLoading] = useState(true);
-  const [verificandoAcceso, setVerificandoAcceso] = useState(true);
   const [filtroRol, setFiltroRol] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
 
-  // 1. Verifica acceso (solo admin)
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await authAPI.profile();
-        if (data?.data?.rol !== "admin") {
-          toast.error("Solo administradores pueden acceder al dashboard");
-          navigate("/login");
-          return;
-        }
-      } catch {
-        toast.error("Sesión inválida");
-        navigate("/login");
-        return;
-      }
-      setVerificandoAcceso(false);
-    })();
-  }, [navigate]);
-
-  // 2. Carga inicial del resumen
+  // Carga inicial del resumen (el acceso lo garantiza ProtectedRoute roles={["admin"]})
   const cargar = useCallback(async () => {
     try {
       setLoading(true);
@@ -94,13 +70,11 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (verificandoAcceso) return;
     cargar();
-  }, [verificandoAcceso, cargar]);
+  }, [cargar]);
 
-  // 3. Realtime: cualquier cambio en gamificacion_progreso recarga
+  // Realtime: cualquier cambio en gamificacion_progreso recarga
   useEffect(() => {
-    if (verificandoAcceso) return;
     const channel = supabase
       .channel("gamificacion-resumen")
       .on(
@@ -110,7 +84,7 @@ export default function AdminDashboardPage() {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [verificandoAcceso, cargar]);
+  }, [cargar]);
 
   const reiniciarTour = async (idEmpleado: string, nombre: string) => {
     if (!window.confirm(`¿Reiniciar tour de ${nombre}? El empleado lo verá de nuevo al entrar.`)) return;
@@ -121,11 +95,6 @@ export default function AdminDashboardPage() {
     } catch {
       toast.error("No se pudo reiniciar el tour");
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
   };
 
   const filtrados = resumen.filter((r) => {
@@ -139,46 +108,8 @@ export default function AdminDashboardPage() {
     ? Math.round(resumen.reduce((s, r) => s + (r.porcentaje_completado || 0), 0) / resumen.length)
     : 0;
 
-  if (verificandoAcceso) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-[#01EDDF]/5">
-        <div className="text-gray-500">Verificando acceso…</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-[#01EDDF]/5">
-      {/* Navbar admin */}
-      <nav className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-20">
-          <div className="flex items-center gap-3">
-            <img src={logoImage} alt="Cárdenas Visión" className="h-12 w-auto" />
-            <div>
-              <h1 className="text-lg font-semibold" style={{ color: TEAL_DARK }}>Panel Admin</h1>
-              <p className="text-xs text-gray-500">Dashboard de Onboarding</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9] hover:text-white rounded-full"
-              onClick={() => navigate("/login")}
-            >
-              Portal empleados
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-full"
-              onClick={handleLogout}
-            >
-              Cerrar sesión
-            </Button>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
         {/* Hero */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2" style={{ color: TEAL }}>
@@ -290,8 +221,7 @@ export default function AdminDashboardPage() {
           Datos actualizados en tiempo real ·{" "}
           <span className="inline-block w-2 h-2 bg-emerald-400 rounded-full align-middle animate-pulse" /> Conectado
         </p>
-      </main>
-    </div>
+    </>
   );
 }
 

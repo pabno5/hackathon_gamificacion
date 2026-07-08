@@ -1,9 +1,6 @@
 import CitasCalendar from '../components/citas/CitasCalendar';
 
+// El shell (header/nav) lo provee PortalLayout; aquí solo la vista.
 export default function CalendarioPage() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <CitasCalendar />
-    </div>
-  );
+  return <CitasCalendar />;
 }
