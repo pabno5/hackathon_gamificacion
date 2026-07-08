@@ -77,14 +77,14 @@ class EmpleadosService {
     }
   }
 
-  async desactivar(idEmpleado) {
-    const ok = await this.repo.setActivo(idEmpleado, false);
+  async desactivar(idEmpleado, actorId) {
+    const ok = await this.repo.setActivo(idEmpleado, false, actorId);
     if (!ok) throw new NotFoundError('Empleado');
     this.events?.emit('empleado.desactivado', { idEmpleado });
   }
 
-  async reactivar(idEmpleado) {
-    const ok = await this.repo.setActivo(idEmpleado, true);
+  async reactivar(idEmpleado, actorId) {
+    const ok = await this.repo.setActivo(idEmpleado, true, actorId);
     if (!ok) throw new NotFoundError('Empleado');
   }
 

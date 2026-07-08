@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 export function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { from: "bot", text: "¡Hola! 👋 Soy Cardenitas, tu asistente personal. Estoy aquí para ayudarte con cualquier duda sobre el proceso." }
+    { from: "bot", text: "¡Hola! 👋 Soy Cardenitas, el asistente virtual de Clínica Cárdenas Visión. Puedo ayudarte con dudas sobre servicios, EPS, horarios y cómo agendar." }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -66,7 +66,7 @@ export function ChatBot() {
                   <MessageCircle className="w-5 h-5" />
                   Cardenitas
                 </h4>
-                <p className="text-sm text-white/90">Asistente de empleados</p>
+                <p className="text-sm text-white/90">Asistente virtual</p>
               </div>
               <button
                 onClick={() => setIsOpen(false)}

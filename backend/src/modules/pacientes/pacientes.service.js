@@ -40,7 +40,7 @@ class PacientesService {
     return await this.repo.create(datos, idEmpleadoCreador);
   }
 
-  async actualizar(id, datos) {
+  async actualizar(id, datos, idEmpleado) {
     const existente = await this.repo.findById(id);
     if (!existente) throw new NotFoundError('Paciente');
 
@@ -49,13 +49,13 @@ class PacientesService {
       if (dup) throw new ConflictError('El correo ya está registrado');
     }
 
-    const actualizado = await this.repo.update(id, datos);
+    const actualizado = await this.repo.update(id, datos, idEmpleado);
     if (!actualizado) throw new NotFoundError('Paciente');
     return actualizado;
   }
 
-  async eliminar(id) {
-    const ok = await this.repo.softDelete(id);
+  async eliminar(id, idEmpleado) {
+    const ok = await this.repo.softDelete(id, idEmpleado);
     if (!ok) throw new NotFoundError('Paciente');
   }
 }

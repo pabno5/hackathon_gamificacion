@@ -5,7 +5,7 @@
  * Un "paciente" es una persona que NO tiene fila en `empleados`.
  * Las queries filtran por `deleted_at IS NULL` (soft delete).
  */
-const { getPool } = require('../../infrastructure/db');
+const { getPool, queryAs } = require('../../infrastructure/db');
 
 const pool = getPool();
 
@@ -91,7 +91,7 @@ class PacientesRepository {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING ${COLS_PLAIN}
     `;
-    const { rows } = await pool.query(sql, [
+    const { rows } = await queryAs(createdBy, sql, [
       data.tipo_documento,
       data.numero_documento,
       data.nombres,
@@ -105,7 +105,7 @@ class PacientesRepository {
     return rows[0];
   }
 
-  async update(id, data) {
+  async update(id, data, updatedBy) {
     const campos = [];
     const valores = [];
     let idx = 1;
@@ -132,7 +132,7 @@ class PacientesRepository {
        WHERE id_persona = $${idx} AND deleted_at IS NULL
       RETURNING ${COLS_PLAIN}
     `;
-    const { rows } = await pool.query(sql, valores);
+    const { rows } = await queryAs(updatedBy, sql, valores);
     return rows[0] || null;
   }
 
@@ -143,7 +143,7 @@ class PacientesRepository {
        WHERE id_persona = $1 AND deleted_at IS NULL
       RETURNING id_persona
     `;
-    const { rowCount } = await pool.query(sql, [id]);
+    const { rowCount } = await queryAs(deletedBy, sql, [id]);
     return rowCount > 0;
   }
 

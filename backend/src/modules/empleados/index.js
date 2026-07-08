@@ -31,12 +31,12 @@ function createEmpleadosModule() {
   }));
 
   router.post('/:id/desactivar', asyncHandler(async (req, res) => {
-    await service.desactivar(req.params.id);
+    await service.desactivar(req.params.id, req.user.id_empleado);
     res.json(ApiResponse.success({ activo: false }));
   }));
 
   router.post('/:id/reactivar', asyncHandler(async (req, res) => {
-    await service.reactivar(req.params.id);
+    await service.reactivar(req.params.id, req.user.id_empleado);
     res.json(ApiResponse.success({ activo: true }));
   }));
 

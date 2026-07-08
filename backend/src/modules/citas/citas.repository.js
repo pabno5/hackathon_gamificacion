@@ -1,4 +1,4 @@
-const { getPool } = require('../../infrastructure/db');
+const { getPool, queryAs } = require('../../infrastructure/db');
 
 const pool = getPool();
 
@@ -83,22 +83,21 @@ class CitasRepository {
   }
 
   async create(data, createdBy) {
-    const { rows } = await pool.query(
-      `INSERT INTO citas (
+    const sqlInsert = `
+      INSERT INTO citas (
         id_paciente, id_medico, id_sede, id_especialidad,
         fecha_cita, hora_inicio, hora_fin, motivo, estado, canal, created_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::estado_cita, 'pendiente'), $10, $11)
-      RETURNING id_cita`,
-      [
-        data.id_paciente, data.id_medico, data.id_sede,
-        data.id_especialidad || null,
-        data.fecha_cita, data.hora_inicio, data.hora_fin,
-        data.motivo || null,
-        data.estado || null,
-        data.canal,
-        createdBy,
-      ]
-    );
+      RETURNING id_cita`;
+    const { rows } = await queryAs(createdBy, sqlInsert, [
+      data.id_paciente, data.id_medico, data.id_sede,
+      data.id_especialidad || null,
+      data.fecha_cita, data.hora_inicio, data.hora_fin,
+      data.motivo || null,
+      data.estado || null,
+      data.canal,
+      createdBy,
+    ]);
     return await this.findById(rows[0].id_cita);
   }
 
@@ -116,7 +115,8 @@ class CitasRepository {
     if (sets.length === 0) return await this.findById(id);
     sets.push(`updated_by = $${idx++}`); vals.push(updatedBy);
     vals.push(id);
-    const { rowCount } = await pool.query(
+    const { rowCount } = await queryAs(
+      updatedBy,
       `UPDATE citas SET ${sets.join(', ')}
         WHERE id_cita = $${idx} AND deleted_at IS NULL`,
       vals

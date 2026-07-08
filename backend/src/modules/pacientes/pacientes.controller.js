@@ -29,7 +29,7 @@ class PacientesController {
   });
 
   actualizar = asyncHandler(async (req, res) => {
-    const p = await this.service.actualizar(req.params.id, req.body);
+    const p = await this.service.actualizar(req.params.id, req.body, req.user.id_empleado);
     res.json(ApiResponse.success(p, 'Paciente actualizado'));
   });
 

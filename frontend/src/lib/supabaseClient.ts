@@ -15,3 +15,18 @@ export const supabase = createClient(url, anon, {
     detectSessionInUrl: true,
   },
 });
+
+// Mantener sincronizado el token cacheado en localStorage con el JWT vigente
+// (FT-05). Así los lectores directos (progressTracker, tourManager) nunca usan
+// un token expirado tras un auto-refresh de Supabase.
+supabase.auth.onAuthStateChange((_event, session) => {
+  try {
+    if (session?.access_token) {
+      localStorage.setItem('authToken', session.access_token);
+    } else {
+      localStorage.removeItem('authToken');
+    }
+  } catch {
+    /* noop */
+  }
+});

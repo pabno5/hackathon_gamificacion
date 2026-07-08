@@ -1,4 +1,4 @@
-const { getPool } = require('../../infrastructure/db');
+const { getPool, queryAs, setActor } = require('../../infrastructure/db');
 
 const pool = getPool();
 
@@ -61,6 +61,7 @@ class EmpleadosRepository {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      await setActor(client, createdBy);
 
       const personaIns = await client.query(
         `INSERT INTO personas (
@@ -96,8 +97,9 @@ class EmpleadosRepository {
     }
   }
 
-  async setActivo(idEmpleado, activo) {
-    const { rowCount } = await pool.query(
+  async setActivo(idEmpleado, activo, actorId) {
+    const { rowCount } = await queryAs(
+      actorId,
       'UPDATE empleados SET activo = $1 WHERE id_empleado = $2', [activo, idEmpleado]
     );
     return rowCount > 0;
@@ -107,6 +109,7 @@ class EmpleadosRepository {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      await setActor(client, activadoPor);
       // Resetear progreso
       await client.query(
         'UPDATE gamificacion_progreso SET visitada = FALSE, fecha_visita = NULL WHERE id_empleado = $1',

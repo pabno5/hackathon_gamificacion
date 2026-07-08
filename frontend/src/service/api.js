@@ -11,13 +11,21 @@ const apiV1 = axios.create({ baseURL: API_V1, withCredentials: true });
 const apiLegacy = axios.create({ baseURL: API_BASE, withCredentials: true });
 
 async function attachToken(config) {
-  let token = localStorage.getItem('authToken');
-  if (!token) {
+  // Preferir el token vigente de Supabase (auto-refrescado) sobre el cacheado,
+  // que puede estar expirado. getSession() lee de memoria/localStorage de
+  // supabase-js y refresca si hace falta (FT-05: evita mandar JWT stale).
+  let token = null;
+  try {
     const { data } = await supabase.auth.getSession();
     token = data.session?.access_token || null;
-    if (token) localStorage.setItem('authToken', token);
+  } catch {
+    /* noop */
   }
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (!token) token = localStorage.getItem('authToken');
+  if (token) {
+    localStorage.setItem('authToken', token);
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 }
 

@@ -382,8 +382,11 @@ BEGIN
         v_id_registro := (COALESCE(v_datos_nue, v_datos_ant) ->> v_pk_col)::UUID;
     END IF;
 
-    INSERT INTO audit_log (tabla_afectada, accion, id_registro, datos_anteriores, datos_nuevos)
-    VALUES (TG_TABLE_NAME, TG_OP, v_id_registro, v_datos_ant, v_datos_nue);
+    -- El actor lo fija la app vía set_config('app.current_empleado', ...) dentro
+    -- de la transacción (NF-03). Si no se fijó (writes de sistema/cron), queda NULL.
+    INSERT INTO audit_log (tabla_afectada, accion, id_registro, datos_anteriores, datos_nuevos, id_empleado)
+    VALUES (TG_TABLE_NAME, TG_OP, v_id_registro, v_datos_ant, v_datos_nue,
+            NULLIF(current_setting('app.current_empleado', true), '')::uuid);
 
     RETURN COALESCE(NEW, OLD);
 END;
