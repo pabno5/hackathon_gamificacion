@@ -15,6 +15,7 @@ import ContrastToggle from "./components/ContrastToggle";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PortalLayout from "./components/portal/PortalLayout";
 import PortalInicio from "./components/portal/PortalInicio";
+import CitasFlow from "./components/portal/CitasFlow";
 import { AuthProvider, useAuth } from "./lib/authContext";
 
 function HomePage() {
@@ -86,6 +87,14 @@ export default function App() {
             }
           />
           <Route path="agenda" element={<CalendarioPage />} />
+          <Route
+            path="citas"
+            element={
+              <ProtectedRoute roles={["recepcionista", "admin"]}>
+                <CitasFlow />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         {/* Compat: rutas viejas redirigen a las nuevas */}
