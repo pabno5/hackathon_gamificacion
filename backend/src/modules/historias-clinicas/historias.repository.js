@@ -1,4 +1,4 @@
-const { getPool } = require('../../infrastructure/db');
+const { getPool, queryAs } = require('../../infrastructure/db');
 
 const pool = getPool();
 
@@ -65,7 +65,7 @@ class HistoriasRepository {
       VALUES (${placeholders.join(', ')})
       RETURNING *
     `;
-    const { rows } = await pool.query(sql, vals);
+    const { rows } = await queryAs(createdBy, sql, vals);
     return rows[0];
   }
 
@@ -91,7 +91,7 @@ class HistoriasRepository {
        WHERE id_historia = $${idx} AND deleted_at IS NULL
       RETURNING *
     `;
-    const { rows } = await pool.query(sql, vals);
+    const { rows } = await queryAs(updatedBy, sql, vals);
     return rows[0] || null;
   }
 }

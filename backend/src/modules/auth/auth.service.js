@@ -1,7 +1,7 @@
-const { getPool } = require('../../infrastructure/db');
+const { getPool, queryAs } = require('../../infrastructure/db');
 const { getSupabaseClient } = require('../../infrastructure/supabase');
 const {
-  UnauthorizedError, NotFoundError, ConflictError, ValidationError,
+  UnauthorizedError, NotFoundError, ForbiddenError,
 } = require('../../shared/errors/AppError');
 
 const pool = getPool();
@@ -39,9 +39,10 @@ class AuthService {
     return rows[0];
   }
 
-  /** Marca `primer_login = false` (idempotente). */
+  /** Marca `primer_login = false` (idempotente). Actor = el propio empleado. */
   async marcarPrimerLoginCompletado(idEmpleado) {
-    await pool.query(
+    await queryAs(
+      idEmpleado,
       'UPDATE empleados SET primer_login = FALSE WHERE id_empleado = $1',
       [idEmpleado]
     );
@@ -56,65 +57,23 @@ class AuthService {
   }
 
   /**
-   * Registra una persona y la vincula como empleado del usuario autenticado.
-   * Usado en el flujo "primer login → completar perfil" del frontend.
+   * El alta de empleados es EXCLUSIVA del administrador (ADM-01 / PRD P-03).
    *
-   * Crea la persona; si el `auth_uid` no tiene empleado, lo crea con rol
-   * recepcionista por defecto (autorregistro). Solo lo invoca un usuario
-   * ya autenticado en Supabase Auth.
+   * Este endpoint NO crea empleados ni asigna roles: hacerlo permitiría a
+   * cualquier usuario de Supabase Auth auto-otorgarse rol recepcionista
+   * (escalada de privilegios). Un empleado válido siempre es creado por el
+   * admin con su persona vinculada, así que aquí solo devolvemos la persona
+   * ya asociada. Si no existe empleado, se rechaza.
    */
-  async registrarPersona(datos, authUid, email) {
-    const req = ['tipo_documento', 'numero_documento', 'nombres', 'apellidos', 'telefono'];
-    for (const k of req) {
-      if (!datos[k] || String(datos[k]).trim() === '') {
-        throw new ValidationError(`${k} es requerido`);
-      }
-    }
-    const dup = await pool.query(
-      'SELECT id_persona FROM personas WHERE numero_documento = $1 LIMIT 1',
-      [datos.numero_documento]
+  async registrarPersona(_datos, authUid) {
+    const { rows } = await pool.query(
+      'SELECT id_persona FROM empleados WHERE auth_uid = $1 LIMIT 1',
+      [authUid]
     );
-    if (dup.rows.length > 0) {
-      throw new ConflictError('El número de documento ya está registrado');
+    if (rows.length === 0) {
+      throw new ForbiddenError('El registro de empleados es exclusivo del administrador');
     }
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const pIns = await client.query(
-        `INSERT INTO personas (tipo_documento, numero_documento, nombres, apellidos,
-                               fecha_nacimiento, telefono, direccion, correo)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id_persona`,
-        [
-          datos.tipo_documento, datos.numero_documento, datos.nombres, datos.apellidos,
-          datos.fecha_nacimiento || null, datos.telefono, datos.direccion || null,
-          datos.correo || email || null,
-        ]
-      );
-      const id_persona = pIns.rows[0].id_persona;
-
-      // Si auth_uid no tiene empleado, vincular como recepcionista por defecto
-      const ya = await client.query(
-        'SELECT 1 FROM empleados WHERE auth_uid = $1 LIMIT 1', [authUid]
-      );
-      if (ya.rows.length === 0) {
-        const rolRes = await client.query(
-          "SELECT id_rol FROM roles WHERE nombre = 'recepcionista' LIMIT 1"
-        );
-        await client.query(
-          `INSERT INTO empleados (id_persona, id_rol, auth_uid, primer_login)
-           VALUES ($1, $2, $3, TRUE)`,
-          [id_persona, rolRes.rows[0].id_rol, authUid]
-        );
-      }
-      await client.query('COMMIT');
-      return { id_persona };
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
+    return { id_persona: rows[0].id_persona };
   }
 
   /** Solicita correo de recuperación de contraseña (Supabase Auth). */

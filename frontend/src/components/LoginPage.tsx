@@ -186,7 +186,13 @@ export function LoginPage({ onBack }: LoginPageProps) {
     const handler = (e: any) => {
       const detail = e?.detail;
       if (detail && typeof detail.percent === 'number') {
-        setProgress(detail.percent);
+        // GAM-08: badge/notificación al completar el 100% (una sola vez).
+        setProgress((prev) => {
+          if (detail.percent === 100 && prev < 100) {
+            toast.success('🎉 ¡Completaste tu onboarding! Exploraste el 100% de tu rol.');
+          }
+          return detail.percent;
+        });
       }
     };
 
@@ -287,7 +293,8 @@ export function LoginPage({ onBack }: LoginPageProps) {
     if (option === "Citas") {
       setCurrentView("userTypeSelection");
     } else {
-      toast.success(`Has seleccionado: ${option}`);
+      // Exámenes/Laboratorios/Especialidades: fuera de alcance v1 (PRD §9).
+      toast.info(`${option}: módulo próximamente disponible`);
     }
   };
 

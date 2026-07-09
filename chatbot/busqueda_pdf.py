@@ -314,12 +314,21 @@ Responde a la consulta siguiendo estrictamente las reglas indicadas. Sé breve: 
 
 app = FastAPI(title="Chatbot Clínica Cárdenas Visión")
 
+# CORS: en producción restringir a los orígenes de la landing (NF-01 / Fase 8.4).
+# CHATBOT_CORS_ORIGINS = lista separada por comas; default = dev local.
+_cors_env = os.environ.get("CHATBOT_CORS_ORIGINS", "")
+_cors_origins = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env
+    else ["http://localhost:5173", "http://localhost:4173"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
 )
 
 

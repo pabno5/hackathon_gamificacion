@@ -12,6 +12,7 @@ import { Toaster } from "./components/ui/sonner";
 import CalendarioPage from "./pages/CalendarioPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ContrastToggle from "./components/ContrastToggle";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function HomePage() {
   const navigate = useNavigate();
@@ -36,13 +37,9 @@ function HomePage() {
 
 function LoginPageWrapper() {
   const navigate = useNavigate();
-  
-  return (
-    <>
-      <LoginPage onBack={() => navigate("/")} />
-      <ChatBot />
-    </>
-  );
+
+  // BOT-01: el chatbot es SOLO para la landing pública, no en el portal de empleados.
+  return <LoginPage onBack={() => navigate("/")} />;
 }
 
 export default function App() {
@@ -51,8 +48,22 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPageWrapper />} />
-        <Route path="/calendario" element={<CalendarioPage />} />
-        <Route path="/admin" element={<AdminDashboardPage />} />
+        <Route
+          path="/calendario"
+          element={
+            <ProtectedRoute>
+              <CalendarioPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute roles={["admin"]}>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
       <Toaster />
     </Router>
