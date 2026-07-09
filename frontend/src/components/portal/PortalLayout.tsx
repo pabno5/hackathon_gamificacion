@@ -1,26 +1,56 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { logout } from "../../service/user.service";
+import { initProgressTracker, refreshProgress } from "../../lib/progressTracker";
+import { startTourIfFirstLogin } from "../../lib/tourManager";
+import { useAuth } from "../../lib/authContext";
 import PortalNav from "./PortalNav";
 import logoImage from "../../assets/logo.png";
 
 /**
  * Shell del portal de empleados: header (logo, barra de progreso GAM-05, logout)
  * + nav por rol + <Outlet/> para la vista activa.
+ *
+ * Aquí también viven el init del tracker de gamificación y el arranque del
+ * tour de primer login (antes en el monolito LoginPage).
  */
 export default function PortalLayout() {
   const navigate = useNavigate();
+  const { user, rol, loading } = useAuth();
   const [progress, setProgress] = useState(0);
+  const tourLanzado = useRef(false);
 
+  // Barra de progreso de gamificación (GAM-05) + badge al 100% (GAM-08)
   useEffect(() => {
     const handler = (e: Event) => {
       const pct = (e as CustomEvent)?.detail?.percent;
-      if (typeof pct === "number") setProgress(pct);
+      if (typeof pct === "number") {
+        setProgress((prev) => {
+          if (pct === 100 && prev < 100 && prev > 0) {
+            toast.success("🎉 ¡Completaste tu onboarding! Exploraste el 100% de tu rol.");
+          }
+          return pct;
+        });
+      }
     };
     window.addEventListener("progressTracker:update", handler as EventListener);
     return () => window.removeEventListener("progressTracker:update", handler as EventListener);
   }, []);
+
+  // Init del tracker + tour de primer login (GAM-01), una vez con rol resuelto
+  useEffect(() => {
+    if (loading || !rol || tourLanzado.current) return;
+    tourLanzado.current = true;
+    try {
+      initProgressTracker((user?.correo as string) || "guest");
+    } catch { /* noop */ }
+    refreshProgress();
+    // Deja montar la vista antes de resaltar elementos (comportamiento del monolito)
+    const t = setTimeout(() => { startTourIfFirstLogin(); }, 600);
+    return () => clearTimeout(t);
+  }, [loading, rol, user]);
 
   const handleLogout = async () => {
     await logout();

@@ -3,23 +3,31 @@ import { useAuth } from "../../lib/authContext";
 
 type NavItem = { to: string; label: string; roles: string[] };
 
-// En Inc 1 solo existen dashboard y agenda. Se agregan más items al crearse
-// las rutas (citas/pacientes/historias en Inc 2+).
 const ITEMS: NavItem[] = [
+  { to: "/portal/inicio", label: "Inicio", roles: ["admin", "medico", "recepcionista"] },
   { to: "/portal/dashboard", label: "Dashboard", roles: ["admin"] },
   { to: "/portal/agenda", label: "Agenda", roles: ["admin", "medico", "recepcionista"] },
+  { to: "/portal/citas", label: "Citas", roles: ["admin", "recepcionista"] },
+  { to: "/portal/historias", label: "Historias", roles: ["admin", "medico"] },
 ];
 
 // data-feature-id ancla el tour (tour.factory emite [data-feature-id="..."]).
-// El id de "Agenda" depende del rol: R-06 recepción, M-02 médico, A-07 admin.
+// Ids según Anexo A del PRD; los compartidos varían por rol.
 function featureIdFor(to: string, rol: string): string | undefined {
-  if (to === "/portal/dashboard") return "A-02";
-  if (to === "/portal/agenda") {
-    if (rol === "medico") return "M-02";
-    if (rol === "recepcionista") return "R-06";
-    return "A-07";
+  switch (to) {
+    case "/portal/inicio":
+      return rol === "medico" ? "M-01" : rol === "recepcionista" ? "R-01" : "A-01";
+    case "/portal/dashboard":
+      return "A-02";
+    case "/portal/agenda":
+      return rol === "medico" ? "M-02" : rol === "recepcionista" ? "R-06" : "A-07";
+    case "/portal/citas":
+      return rol === "recepcionista" ? "R-04" : undefined;
+    case "/portal/historias":
+      return rol === "medico" ? "M-03" : undefined;
+    default:
+      return undefined;
   }
-  return undefined;
 }
 
 export default function PortalNav() {
