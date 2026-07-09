@@ -14,6 +14,7 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ContrastToggle from "./components/ContrastToggle";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PortalLayout from "./components/portal/PortalLayout";
+import PortalInicio from "./components/portal/PortalInicio";
 import { AuthProvider, useAuth } from "./lib/authContext";
 
 function HomePage() {
@@ -42,8 +43,8 @@ function LoginPageWrapper() {
   return <LoginForm />;
 }
 
-// Home por rol. En Inc 1 solo existen dashboard y agenda, así que médico y
-// recepción van a agenda; el mapa final (recepción→citas) llega en Inc 2/3.
+// Home del portal: panel de inicio para todos los roles (feature R-01/M-01/A-01
+// del tour = "visitar panel de inicio").
 function PortalIndexRedirect() {
   const { rol, loading } = useAuth();
   if (loading) {
@@ -53,8 +54,7 @@ function PortalIndexRedirect() {
       </div>
     );
   }
-  if (rol === "admin") return <Navigate to="/portal/dashboard" replace />;
-  if (rol === "medico" || rol === "recepcionista") return <Navigate to="/portal/agenda" replace />;
+  if (rol) return <Navigate to="/portal/inicio" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -76,6 +76,7 @@ export default function App() {
           }
         >
           <Route index element={<PortalIndexRedirect />} />
+          <Route path="inicio" element={<PortalInicio />} />
           <Route
             path="dashboard"
             element={
