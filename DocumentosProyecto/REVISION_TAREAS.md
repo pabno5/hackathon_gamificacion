@@ -22,16 +22,16 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 - [x] **FE-01** ChatBot fuera del portal (BOT-01) + subtítulo/saludo corregidos a público.
   *`App.tsx` (quitado de `/login`), `ChatBot.tsx`.*
-- [ ] **FE-02** `data-feature-id` en elementos del portal (tour cae a modal centrado).
-  *Pendiente — requiere primero partir el portal por rol (FT-04); sin vistas por rol no hay dónde anclar la mayoría de los pasos.*
-- [ ] **FE-03** Tracking por clicks: solo 3 de 22 features mapeadas.
-  *Pendiente — depende de FT-04 (los elementos por rol aún no existen).*
-- [~] **FE-04** Portal sin distinción de roles.
-  *Inc 1 de FT-04 hecho: `PortalLayout` + `PortalNav` por rol, rutas `/portal/*`, dashboard y agenda bajo el shell con guards. Falta migrar citas/historia del monolito (Inc 2+).*
+- [~] **FE-02** `data-feature-id` en elementos del portal (tour cae a modal centrado).
+  *Avance Inc 2: anclados Inicio (R-01/M-01/A-01), Dashboard (A-02), Agenda (R-06/M-02/A-07), Citas (R-04), Historias (M-03) en `PortalNav`/`PortalInicio`. Faltan features de acción (R-02/R-03/R-05/R-07/R-08, M-04..M-07, A-03..A-06) → Inc 3/4.*
+- [~] **FE-03** Tracking por clicks: solo 3 de 22 features mapeadas.
+  *Avance Inc 2: tracking de cards conservado en `PortalInicio`; mapa completo de acciones → Inc 3/4.*
+- [x] **FE-04** Portal sin distinción de roles.
+  *Resuelto en Inc 2 de FT-04: nav filtrado por rol, rutas con guards por rol (`/portal/citas` recepción+admin, `/portal/historias` médico+admin, `/portal/dashboard` admin), home común `/portal/inicio`. Refinamiento visual de cards por rol → Inc 3.*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).
   *`App.tsx`. Nota: el botón "Agendar" del Navbar público ahora rebota a login — considerar cambiar su destino a la sección de contacto (decisión UX del dueño).*
-- [ ] **FE-06** UI recuperar contraseña (AU-03): endpoint existe, front solo `console.log`.
-  *Pendiente — falta pantalla; vive en el archivo muerto ya eliminado, hay que rehacerla en el portal.*
+- [ ] **FE-06** UI recuperar contraseña (AU-03): endpoint existe; `LoginForm` muestra aviso ("solicita al administrador") en vez de flujo real.
+  *Pendiente — flujo completo requiere página de reset (Supabase redirect + updateUser) → Inc 5.*
 
 ---
 
@@ -71,7 +71,7 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 - [~] **FT-03** Suite de tests: arrancada con `node --test` (sin deps nuevas). 6 tests pasando.
   *Cubre filtro de campos HC (HC-05) y tour.factory. Falta: choque de citas, auth middleware (necesitan mocks de DB).*
 - [~] **FT-04** Partir monolito LoginPage (2300+ líneas) en rutas por rol.
-  *Inc 1/5 hecho (fundación): AuthContext, PortalLayout, PortalNav por rol, rutas `/portal/*`, redirects de compat. Spec + plan en `2026-07-08-portal-split-*`. Incrementos 2-5 pendientes (extraer login, migrar citas/historia/pacientes).*
+  *Inc 2/5 hecho: **monolito eliminado**. `LoginForm` en `/login`, `PortalInicio` (home), `CitasFlow` (/portal/citas), `HistoriasFlow` (/portal/historias); tour+tracker viven en `PortalLayout`. Specs/planes: `2026-07-08-portal-split-*`, `2026-07-09-portal-split-inc2-plan.md`. Quedan Inc 3-5 (pulir flujos, feature-ids de acción, vista pacientes).*
 - [x] **FT-05** JWT: interceptor usa token vigente de Supabase; localStorage se sincroniza en cada refresh.
   *`api.js`, `supabaseClient.ts`.*
 

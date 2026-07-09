@@ -1,8 +1,7 @@
 /**
- * Auth contra Supabase. Firmas conservadas para compatibilidad con LoginPage:
+ * Auth contra Supabase.
  *   - login(email, password)  -> true | 'notRegister' | undefined
  *   - logout()                -> void
- *   - registerUser(persona)   -> { success, data }
  */
 import { supabase } from '../lib/supabaseClient';
 
@@ -50,21 +49,6 @@ export async function logout() {
   } finally {
     clearToken();
   }
-}
-
-export async function registerUser(persona) {
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess.session?.access_token;
-  if (!token) throw new Error('No hay sesión activa');
-
-  const response = await fetch(`${API_URL}/auth/register`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(persona),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.message || 'Error al registrar persona');
-  return data;
 }
 
 // Helper para que `api.js` lea el JWT vigente de Supabase si localStorage está vacío.
