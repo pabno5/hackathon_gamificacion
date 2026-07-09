@@ -180,4 +180,15 @@ export const auditAPI = {
   getAll: (params = {}) => apiV1.get('/audit', { params }),
 };
 
+// ============ DOCUMENTOS CHATBOT (v1, solo admin) ============
+export const documentosAPI = {
+  getAll: () => apiV1.get('/chatbot-docs'),
+  subir: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiV1.post('/chatbot-docs', formData);
+  },
+  eliminar: (archivo) => apiV1.delete(`/chatbot-docs/${encodeURIComponent(archivo)}`),
+};
+
 export default apiV1;

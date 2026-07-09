@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
-import { gamificacionAPI, empleadosAPI, authAPI } from "../service/api";
+import { gamificacionAPI, empleadosAPI, authAPI, documentosAPI } from "../service/api";
 import { supabase } from "../lib/supabaseClient";
 import { logout } from "../service/user.service";
 import logoImage from "../assets/logo.png";
@@ -60,6 +60,12 @@ export default function AdminDashboardPage() {
   const [verificandoAcceso, setVerificandoAcceso] = useState(true);
   const [filtroRol, setFiltroRol] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
+
+  // Documentos del chatbot (base de conocimiento)
+  const [documentos, setDocumentos] = useState<{ archivo: string; fragmentos: number }[]>([]);
+  const [cargandoDocs, setCargandoDocs] = useState(true);
+  const [subiendo, setSubiendo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Verifica acceso (solo admin)
   useEffect(() => {
@@ -126,6 +132,56 @@ export default function AdminDashboardPage() {
   const handleLogout = async () => {
     await logout();
     navigate("/");
+  };
+
+  // ===== Documentos del chatbot =====
+  const cargarDocumentos = useCallback(async () => {
+    try {
+      setCargandoDocs(true);
+      const { data } = await documentosAPI.getAll();
+      if (data?.success) setDocumentos(data.data);
+    } catch {
+      toast.error("No se pudo cargar la lista de documentos del chatbot");
+    } finally {
+      setCargandoDocs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (verificandoAcceso) return;
+    cargarDocumentos();
+  }, [verificandoAcceso, cargarDocumentos]);
+
+  const handleSubirPDF = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Solo se permiten archivos PDF");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    try {
+      setSubiendo(true);
+      await documentosAPI.subir(file);
+      toast.success(`"${file.name}" se indexó correctamente`);
+      cargarDocumentos();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "No se pudo subir el PDF");
+    } finally {
+      setSubiendo(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleEliminarDoc = async (archivo: string) => {
+    if (!window.confirm(`¿Eliminar "${archivo}" de la base de conocimiento del chatbot?`)) return;
+    try {
+      await documentosAPI.eliminar(archivo);
+      toast.success(`"${archivo}" eliminado`);
+      cargarDocumentos();
+    } catch {
+      toast.error("No se pudo eliminar el documento");
+    }
   };
 
   const filtrados = resumen.filter((r) => {
@@ -284,6 +340,66 @@ export default function AdminDashboardPage() {
               </table>
             </div>
           )}
+        </div>
+
+        {/* Base de conocimiento del chatbot */}
+        <div className="mt-10">
+          <h2 className="text-2xl font-bold mb-2" style={{ color: TEAL }}>
+            Base de conocimiento del chatbot
+          </h2>
+          <div className="w-20 h-1 mx-0 mb-3" style={{ background: TEAL_LIGHT }} />
+          <p className="text-gray-600 mb-4">
+            Sube los PDFs con la información de la clínica que Cardenitas usará para responder. Solo administradores pueden subir o eliminar documentos.
+          </p>
+
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleSubirPDF}
+              disabled={subiendo}
+              className="flex-1 text-sm text-gray-600"
+            />
+            {subiendo && <span className="text-sm text-gray-400">Subiendo e indexando…</span>}
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            {cargandoDocs ? (
+              <div className="p-12 text-center text-gray-400">Cargando…</div>
+            ) : documentos.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">Aún no hay documentos cargados.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-500">
+                      <th className="px-6 py-4">Archivo</th>
+                      <th className="px-6 py-4">Fragmentos indexados</th>
+                      <th className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documentos.map((doc) => (
+                      <tr key={doc.archivo} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <td className="px-6 py-4 font-medium text-gray-800">{doc.archivo}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{doc.fragmentos}</td>
+                        <td className="px-6 py-4 text-right">
+                          <Button
+                            variant="outline"
+                            className="text-red-500 border-red-300 hover:bg-red-500 hover:text-white rounded-full text-xs px-4 py-1.5"
+                            onClick={() => handleEliminarDoc(doc.archivo)}
+                          >
+                            Eliminar
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
