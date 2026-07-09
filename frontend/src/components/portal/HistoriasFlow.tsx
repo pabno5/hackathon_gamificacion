@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
@@ -14,7 +14,7 @@ import { SchedulingSection } from "../SchedulingSection";
 import { useAuth } from "../../lib/authContext";
 import { notifyClick } from "../../lib/progressTracker";
 import useFeatureVisit from "../../lib/useFeatureVisit";
-import { personasAPI, historiasClinicasAPI } from "../../service/api";
+import { personasAPI, historiasClinicasAPI, citasAPI } from "../../service/api";
 
 /**
  * Flujo de historia clínica — extraído de las vistas historiaClinica /
@@ -23,11 +23,15 @@ import { personasAPI, historiasClinicasAPI } from "../../service/api";
  * (shell = PortalLayout).
  *
  * Entrada vía location.state:
- *   { paso: "formulario", prefill: {...} }  ← viene de CitasFlow (paciente nuevo)
- *   { paso: "generar" }                     ← viene de búsqueda por cédula
- * Sin state: arranca en "formulario" vacío.
+ *   { paso: "formulario", prefill: {...} }       ← viene de CitasFlow (paciente nuevo)
+ *   { paso: "paciente", documento: "123..." }    ← viene de búsqueda por cédula
+ * Sin state: arranca en "paciente" (buscar paciente → ficha con historias
+ * reales + export PDF (M-07) + historial de citas (M-06)).
+ *
+ * Los pasos "generar"/"agendar" (demo con datos ficticios) se conservan,
+ * accesibles desde la ficha con "Vista de demostración".
  */
-type Paso = "formulario" | "generar" | "agendar";
+type Paso = "paciente" | "formulario" | "generar" | "agendar";
 
 type Prefill = {
   nombreCompleto?: string;
@@ -42,14 +46,23 @@ export default function HistoriasFlow() {
   const location = useLocation();
   const { user } = useAuth();
 
-  const entrada = (location.state ?? {}) as { paso?: Paso; prefill?: Prefill };
+  const entrada = (location.state ?? {}) as { paso?: Paso; prefill?: Prefill; documento?: string };
   const prefill = entrada.prefill ?? {};
 
   // Acceder a historia clínica = M-03 (backend ignora el código para admin)
   useFeatureVisit("M-03");
 
-  const [paso, setPaso] = useState<Paso>(entrada.paso === "generar" ? "generar" : "formulario");
+  const [paso, setPaso] = useState<Paso>(
+    entrada.paso === "formulario" ? "formulario" : entrada.paso === "generar" ? "generar" : "paciente"
+  );
   const [showGeneratedHistoria, setShowGeneratedHistoria] = useState(false);
+
+  // Ficha del paciente (paso "paciente")
+  const [docBusqueda, setDocBusqueda] = useState(entrada.documento ?? "");
+  const [paciente, setPaciente] = useState<any>(null);
+  const [historias, setHistorias] = useState<any[]>([]);
+  const [citasPaciente, setCitasPaciente] = useState<any[]>([]);
+  const [cargandoFicha, setCargandoFicha] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("Completando historia clínica");
 
@@ -120,6 +133,93 @@ export default function HistoriasFlow() {
     registroProfesional: "",
     fechaFirma: new Date().toISOString().split('T')[0]
   });
+
+  /** Busca paciente por documento y carga historias + citas reales. */
+  const buscarPaciente = async (documento: string) => {
+    const doc = documento.trim();
+    if (!doc) {
+      toast.error("Ingresa un número de documento");
+      return;
+    }
+    setCargandoFicha(true);
+    try {
+      const res = await personasAPI.getByDocumento(doc);
+      const p = res.data?.data;
+      if (!p) {
+        toast.error("No se encontró ningún paciente con ese documento");
+        return;
+      }
+      setPaciente(p);
+
+      const [histRes, citasRes] = await Promise.all([
+        historiasClinicasAPI.getByPaciente(p.id_persona).catch(() => null),
+        citasAPI.getByPaciente(p.id_persona).catch(() => null),
+      ]);
+      setHistorias(histRes?.data?.data ?? []);
+      setCitasPaciente(citasRes?.data?.data ?? []);
+
+      // Ver historial de citas del paciente = M-06 (la ficha lo muestra)
+      try { notifyClick("M-06"); } catch { /* noop */ }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        toast.error("No se encontró ningún paciente con ese documento");
+      } else {
+        toast.error("Error al buscar el paciente. Intenta de nuevo.");
+      }
+    } finally {
+      setCargandoFicha(false);
+    }
+  };
+
+  // Entrada directa desde CitasFlow con documento: buscar de una
+  const autoBuscado = useRef(false);
+  useEffect(() => {
+    if (entrada.documento && !autoBuscado.current) {
+      autoBuscado.current = true;
+      buscarPaciente(entrada.documento);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Exporta una historia a PDF (HC-06 / M-07). */
+  const exportarPdf = async (idHistoria: string) => {
+    try {
+      toast.loading("Generando PDF...");
+      const res = await historiasClinicasAPI.exportPdf(idHistoria);
+      toast.dismiss();
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `historia_${idHistoria}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      try { notifyClick("M-07"); } catch { /* noop */ }
+    } catch {
+      toast.dismiss();
+      toast.error("No se pudo generar el PDF");
+    }
+  };
+
+  /** Abre el formulario de nueva historia con los datos del paciente. */
+  const nuevaHistoriaDePaciente = () => {
+    if (!paciente) return;
+    setHistoriaClinicaData((prev) => ({
+      ...prev,
+      nombreCompleto: `${paciente.nombres} ${paciente.apellidos}`,
+      documentoIdentidad: paciente.numero_documento,
+      telefono: paciente.telefono ?? "",
+      fechaNacimiento: paciente.fecha_nacimiento?.slice(0, 10) ?? "",
+      direccion: paciente.direccion ?? "",
+    }));
+    setPaso("formulario");
+  };
+
+  const formatFechaCita = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString("es-CO", {
+        day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+      });
+    } catch { return iso; }
+  };
 
   const handleGenerarHistoria = () => {
     setShowGeneratedHistoria(true);
@@ -258,6 +358,188 @@ export default function HistoriasFlow() {
   return (
     <div className="relative">
       <AnimatePresence mode="wait">
+        {paso === "paciente" && !paciente && (
+          <motion.div
+            key="buscarPaciente"
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -100, opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className="w-full max-w-md mx-auto"
+          >
+            <div className="bg-white rounded-3xl shadow-2xl p-10" data-feature-id="M-06">
+              <div className="flex justify-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#038996] to-[#03D4D9] rounded-full flex items-center justify-center shadow-lg">
+                  <FileText className="w-10 h-10 text-white" />
+                </div>
+              </div>
+
+              <div className="text-center mb-10">
+                <h1 className="text-gray-800 mb-3">Historia Clínica</h1>
+                <p className="text-gray-600">Busca al paciente por su número de documento</p>
+              </div>
+
+              <form
+                onSubmit={(e) => { e.preventDefault(); buscarPaciente(docBusqueda); }}
+                className="space-y-6"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="docPaciente" className="text-gray-700">Número de documento*</Label>
+                  <Input
+                    id="docPaciente"
+                    type="text"
+                    placeholder="Ingresa el documento del paciente"
+                    className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                    value={docBusqueda}
+                    onChange={(e) => setDocBusqueda(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={cargandoFicha}
+                  className="w-full h-12 bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-60"
+                >
+                  {cargandoFicha ? "Buscando..." : "Buscar paciente"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9]/10 rounded-xl transition-colors"
+                  onClick={() => setPaso("formulario")}
+                >
+                  Nueva historia sin buscar
+                </Button>
+              </form>
+            </div>
+          </motion.div>
+        )}
+
+        {paso === "paciente" && paciente && (
+          <motion.div
+            key="fichaPaciente"
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -100, opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className="w-full max-w-5xl mx-auto pb-16 space-y-8"
+          >
+            {/* Ficha del paciente */}
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-gray-800 mb-1">{paciente.nombres} {paciente.apellidos}</h1>
+                  <p className="text-gray-600 text-sm">
+                    {paciente.tipo_documento} {paciente.numero_documento}
+                    {paciente.telefono ? ` · Tel: ${paciente.telefono}` : ""}
+                  </p>
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <Button
+                    onClick={nuevaHistoriaDePaciente}
+                    className="bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-full px-6"
+                  >
+                    Nueva historia clínica
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9]/10 rounded-full px-6"
+                    onClick={() => { setPaciente(null); setDocBusqueda(""); }}
+                  >
+                    Buscar otro paciente
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Historias clínicas (HC-03) + export PDF (M-07) */}
+            <div className="bg-white rounded-3xl shadow-xl p-8" data-feature-id="M-07">
+              <div className="bg-gradient-to-r from-[#038996] to-[#03D4D9] text-white px-6 py-3 rounded-lg mb-4">
+                <h2 className="text-xl">Historias clínicas ({historias.length})</h2>
+              </div>
+              {historias.length === 0 ? (
+                <p className="text-gray-500 py-4 text-center">Este paciente aún no tiene historias clínicas registradas.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {historias.map((h) => (
+                    <div key={h.id_historia} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <p className="text-gray-800">
+                          {h.motivo_consulta || "Sin motivo registrado"}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {h.created_at ? formatFechaCita(h.created_at) : "—"}
+                          {h.diagnostico_principal ? ` · Dx: ${h.diagnostico_principal}` : ""}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9] hover:text-white rounded-full px-5 shrink-0"
+                        onClick={() => exportarPdf(h.id_historia)}
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Exportar PDF
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Historial de citas (M-06) */}
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+              <div className="bg-gradient-to-r from-[#038996] to-[#03D4D9] text-white px-6 py-3 rounded-lg mb-4">
+                <h2 className="text-xl">Historial de citas ({citasPaciente.length})</h2>
+              </div>
+              {citasPaciente.length === 0 ? (
+                <p className="text-gray-500 py-4 text-center">Este paciente no tiene citas registradas.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                        <th className="py-3 px-4">Fecha</th>
+                        <th className="py-3 px-4">Motivo</th>
+                        <th className="py-3 px-4">Médico</th>
+                        <th className="py-3 px-4">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {citasPaciente.map((c) => (
+                        <tr key={c.id_cita} className="border-b border-gray-100">
+                          <td className="py-3 px-4 text-gray-700">{formatFechaCita(c.fecha_cita)}</td>
+                          <td className="py-3 px-4 text-gray-700">{c.motivo || "—"}</td>
+                          <td className="py-3 px-4 text-gray-700">
+                            {c.medico ? `${c.medico.nombres} ${c.medico.apellidos}` : "—"}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-3 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                              {c.estado}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Acceso a la vista demo original */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setPaso("generar")}
+                className="text-sm text-gray-400 hover:text-[#03D4D9] transition-colors"
+              >
+                Vista de demostración
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {paso === "generar" && (
           <motion.div
             key="generarHistoria"
@@ -297,7 +579,7 @@ export default function HistoriasFlow() {
                   <Button
                     variant="outline"
                     className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9]/10 rounded-full px-6"
-                    onClick={() => navigate("/portal/inicio")}
+                    onClick={() => setPaso("paciente")}
                   >
                     Volver
                   </Button>

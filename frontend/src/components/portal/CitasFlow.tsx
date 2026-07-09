@@ -100,7 +100,8 @@ export default function CitasFlow() {
         try { notifyClick("R-02"); } catch { /* noop */ }
 
         if (puedeHistoria) {
-          navigate("/portal/historias", { state: { paso: "generar" } });
+          // Ficha real del paciente (historias + citas), no la demo
+          navigate("/portal/historias", { state: { paso: "paciente", documento: existingUserCedula.trim() } });
         } else {
           toast.info("Paciente verificado en el sistema.");
           setPaso("tipo");
