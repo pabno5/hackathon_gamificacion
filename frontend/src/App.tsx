@@ -16,6 +16,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PortalLayout from "./components/portal/PortalLayout";
 import PortalInicio from "./components/portal/PortalInicio";
 import CitasFlow from "./components/portal/CitasFlow";
+import HistoriasFlow from "./components/portal/HistoriasFlow";
 import { AuthProvider, useAuth } from "./lib/authContext";
 
 function HomePage() {
@@ -92,6 +93,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={["recepcionista", "admin"]}>
                 <CitasFlow />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="historias"
+            element={
+              <ProtectedRoute roles={["medico", "admin"]}>
+                <HistoriasFlow />
               </ProtectedRoute>
             }
           />
