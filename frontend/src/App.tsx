@@ -7,7 +7,7 @@ import { EPSSection } from "./components/EPSSection";
 import { AppointmentChatSection } from "./components/AppointmentChatSection";
 import { ChatBot } from "./components/ChatBot";
 import { Footer } from "./components/Footer";
-import { LoginPage } from "./components/LoginPage";
+import LoginForm from "./components/auth/LoginForm";
 import { Toaster } from "./components/ui/sonner";
 import CalendarioPage from "./pages/CalendarioPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -37,11 +37,9 @@ function HomePage() {
   );
 }
 
+// BOT-01: el chatbot es SOLO para la landing pública, no en el portal de empleados.
 function LoginPageWrapper() {
-  const navigate = useNavigate();
-
-  // BOT-01: el chatbot es SOLO para la landing pública, no en el portal de empleados.
-  return <LoginPage onBack={() => navigate("/")} />;
+  return <LoginForm />;
 }
 
 // Home por rol. En Inc 1 solo existen dashboard y agenda, así que médico y
