@@ -14,14 +14,9 @@
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
 const API_V1 = API_URL.replace(/\/api$/, '/api/v1');
 
-// Mapa: id de botón legacy → código de feature de BD.
-// Botones cuyo id YA es un código (R-01, M-03, A-07) pasan directo.
-const BUTTON_TO_FEATURE: Record<string, string> = {
-  'option-citas': 'R-04',
-  'option-historia clinica': 'R-08',
-  'option-generar historia': 'M-04',
-};
-
+// Solo ids que YA son códigos de feature (R-01, M-03, A-07) van al backend.
+// El mapa legacy botón→feature murió con el monolito: las features se marcan
+// donde la acción ocurre de verdad (useFeatureVisit + notifyClick con código).
 const FEATURE_CODE_RE = /^[RMA]-\d{2}$/;
 
 type Resumen = { total: number; visitadas: number; porcentaje: number };
@@ -45,8 +40,7 @@ function getToken(): string | null {
 }
 
 function featureCodeFor(id: string): string | null {
-  if (FEATURE_CODE_RE.test(id)) return id;
-  return BUTTON_TO_FEATURE[id] || null;
+  return FEATURE_CODE_RE.test(id) ? id : null;
 }
 
 function loadLocal(u: string) {

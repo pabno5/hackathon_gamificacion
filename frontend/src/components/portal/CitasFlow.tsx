@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useAuth } from "../../lib/authContext";
+import { notifyClick } from "../../lib/progressTracker";
 import { personasAPI } from "../../service/api";
 
 /**
@@ -95,6 +96,9 @@ export default function CitasFlow() {
         toast.success(`¡Usuario encontrado! Bienvenido ${usuario.nombres} ${usuario.apellidos}`);
         updateProgress(10, "Datos del usuario recuperados");
 
+        // Gamificación: buscar paciente por documento (R-02)
+        try { notifyClick("R-02"); } catch { /* noop */ }
+
         if (puedeHistoria) {
           navigate("/portal/historias", { state: { paso: "generar" } });
         } else {
@@ -147,6 +151,8 @@ export default function CitasFlow() {
           if (nuevoPaciente.data.success && nuevoPaciente.data.data) {
             pacienteId = nuevoPaciente.data.data.id_persona;
             toast.success("Paciente creado exitosamente");
+            // Gamificación: registrar paciente nuevo (R-03)
+            try { notifyClick("R-03"); } catch { /* noop */ }
           }
         }
       }
@@ -293,7 +299,7 @@ export default function CitasFlow() {
             className="w-full max-w-md mx-auto"
           >
             {/* Card Container */}
-            <div className="bg-white rounded-3xl shadow-2xl p-10">
+            <div className="bg-white rounded-3xl shadow-2xl p-10" data-feature-id="R-02">
               {/* Eye icon decoration */}
               <div className="flex justify-center mb-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-[#01EDDF] to-[#03D4D9] rounded-full flex items-center justify-center shadow-lg">
@@ -367,7 +373,7 @@ export default function CitasFlow() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleCitasSubmit} className="bg-white rounded-3xl shadow-xl p-10">
+            <form onSubmit={handleCitasSubmit} className="bg-white rounded-3xl shadow-xl p-10" data-feature-id="R-03">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Nombre del paciente */}
                 <div className="space-y-2">

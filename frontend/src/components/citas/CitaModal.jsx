@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import './CitaModal.css';
 
-const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
+const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onClose }) => {
   const [formData, setFormData] = useState({
     id_paciente: '',
     id_medico: '',
+    id_sede: '',
+    canal: 'presencial',
     fecha_cita: '',
     motivo: '',
     estado: 'pendiente',
@@ -27,7 +29,9 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
       setFormData({
         id_paciente: cita.id_paciente || '',
         id_medico: cita.id_medico || '',
-        fecha_cita: cita.fecha_cita 
+        id_sede: cita.id_sede || '',
+        canal: cita.canal || 'presencial',
+        fecha_cita: cita.fecha_cita
           ? new Date(cita.fecha_cita).toISOString().slice(0, 16)
           : '',
         motivo: cita.motivo || '',
@@ -140,6 +144,10 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
       newErrors.id_medico = 'Debe seleccionar un médico';
     }
 
+    if (!formData.id_sede) {
+      newErrors.id_sede = 'Debe seleccionar una sede';
+    }
+
     if (!formData.fecha_cita) {
       newErrors.fecha_cita = 'Debe seleccionar una fecha y hora';
     }
@@ -238,6 +246,42 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
               ))}
             </select>
             {errors.id_medico && <span className="error-message">{errors.id_medico}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="id_sede">
+              Sede <span className="required">*</span>
+            </label>
+            <select
+              id="id_sede"
+              name="id_sede"
+              value={formData.id_sede}
+              onChange={handleChange}
+              className={errors.id_sede ? 'error' : ''}
+            >
+              <option value="">Seleccione una sede</option>
+              {sedes.map(sede => (
+                <option key={sede.id_sede} value={sede.id_sede}>
+                  {sede.nombre}
+                </option>
+              ))}
+            </select>
+            {errors.id_sede && <span className="error-message">{errors.id_sede}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="canal">
+              Canal de agendamiento <span className="required">*</span>
+            </label>
+            <select
+              id="canal"
+              name="canal"
+              value={formData.canal}
+              onChange={handleChange}
+            >
+              <option value="presencial">Presencial</option>
+              <option value="telefonico">Telefónico (callcenter)</option>
+            </select>
           </div>
 
           <div className="form-group">
@@ -388,7 +432,7 @@ const CitaModal = ({ cita, medicos, pacientes, onSave, onDelete, onClose }) => {
                 className="btn-delete"
                 onClick={handleDelete}
               >
-                Eliminar
+                Cancelar cita
               </button>
             )}
             <div className="actions-right">

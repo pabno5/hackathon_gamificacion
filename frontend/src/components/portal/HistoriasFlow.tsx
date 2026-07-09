@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { GeneratedHistoriaClinica } from "../GeneratedHistoriaClinica";
 import { SchedulingSection } from "../SchedulingSection";
 import { useAuth } from "../../lib/authContext";
+import { notifyClick } from "../../lib/progressTracker";
+import useFeatureVisit from "../../lib/useFeatureVisit";
 import { personasAPI, historiasClinicasAPI } from "../../service/api";
 
 /**
@@ -42,6 +44,9 @@ export default function HistoriasFlow() {
 
   const entrada = (location.state ?? {}) as { paso?: Paso; prefill?: Prefill };
   const prefill = entrada.prefill ?? {};
+
+  // Acceder a historia clínica = M-03 (backend ignora el código para admin)
+  useFeatureVisit("M-03");
 
   const [paso, setPaso] = useState<Paso>(entrada.paso === "generar" ? "generar" : "formulario");
   const [showGeneratedHistoria, setShowGeneratedHistoria] = useState(false);
@@ -205,6 +210,15 @@ export default function HistoriasFlow() {
 
       if (response.data.success) {
         toast.success("Historia clínica guardada correctamente en el sistema.");
+
+        // Gamificación: crear historia clínica (M-04); con diagnóstico → M-05
+        try {
+          notifyClick("M-04");
+          if (historiaClinicaData.diagnosticoPrincipal.trim()) {
+            notifyClick("M-05");
+          }
+        } catch { /* noop */ }
+
         setProgress(100);
         setProgressMessage("¡Historia clínica guardada exitosamente!");
         setTimeout(() => navigate("/portal/inicio"), 2000);
@@ -333,7 +347,7 @@ export default function HistoriasFlow() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleHistoriaClinicaSubmit} className="bg-white rounded-3xl shadow-xl p-10 space-y-8">
+            <form onSubmit={handleHistoriaClinicaSubmit} className="bg-white rounded-3xl shadow-xl p-10 space-y-8" data-feature-id="M-04">
 
               {/* 1. Datos de Identificación */}
               <div className="space-y-4">

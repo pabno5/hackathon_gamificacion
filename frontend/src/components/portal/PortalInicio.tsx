@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { motion } from "motion/react";
 import { useAuth } from "../../lib/authContext";
 import { registerButton, notifyClick } from "../../lib/progressTracker";
+import useFeatureVisit from "../../lib/useFeatureVisit";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import citasImage from "../../assets/citas.jpg";
 import examenesImage from "../../assets/examenes.jpg";
@@ -26,6 +27,13 @@ const INICIO_FEATURE: Record<string, string> = {
 export default function PortalInicio() {
   const navigate = useNavigate();
   const { rol } = useAuth();
+
+  // Visitar el panel de inicio = feature R-01/M-01/A-01
+  useFeatureVisit(rol ? INICIO_FEATURE[rol] : null);
+
+  // Card "Citas" navega a /portal/citas (recepción+admin); médico no pasa
+  // ese guard, así que no se le muestra.
+  const muestraCitas = rol === "recepcionista" || rol === "admin";
 
   // Registrar las opciones para el tracker (comportamiento del monolito)
   useEffect(() => {
@@ -62,19 +70,21 @@ export default function PortalInicio() {
 
       {/* Options Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-        {/* Citas */}
-        <motion.button
-          onClick={() => handleOptionClick("Citas")}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="rounded-[20px] shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-64"
-        >
-          <img
-            src={citasImage}
-            alt="Citas"
-            className="w-full h-full object-cover"
-          />
-        </motion.button>
+        {/* Citas — solo roles que pasan el guard de /portal/citas */}
+        {muestraCitas && (
+          <motion.button
+            onClick={() => handleOptionClick("Citas")}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="rounded-[20px] shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden h-64"
+          >
+            <img
+              src={citasImage}
+              alt="Citas"
+              className="w-full h-full object-cover"
+            />
+          </motion.button>
+        )}
 
         {/* Exámenes */}
         <motion.button

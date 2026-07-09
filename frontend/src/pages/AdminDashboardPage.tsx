@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { gamificacionAPI, empleadosAPI } from "../service/api";
 import { supabase } from "../lib/supabaseClient";
+import useFeatureVisit from "../lib/useFeatureVisit";
 
 type Resumen = {
   id_empleado: string;
@@ -51,6 +52,8 @@ function formatDate(iso: string | null) {
 }
 
 export default function AdminDashboardPage() {
+  // Ver dashboard de gamificación = A-02
+  useFeatureVisit("A-02");
   const [resumen, setResumen] = useState<Resumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroRol, setFiltroRol] = useState<string>("todos");

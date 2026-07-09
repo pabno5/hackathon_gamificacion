@@ -23,9 +23,9 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 - [x] **FE-01** ChatBot fuera del portal (BOT-01) + subtítulo/saludo corregidos a público.
   *`App.tsx` (quitado de `/login`), `ChatBot.tsx`.*
 - [~] **FE-02** `data-feature-id` en elementos del portal (tour cae a modal centrado).
-  *Avance Inc 2: anclados Inicio (R-01/M-01/A-01), Dashboard (A-02), Agenda (R-06/M-02/A-07), Citas (R-04), Historias (M-03) en `PortalNav`/`PortalInicio`. Faltan features de acción (R-02/R-03/R-05/R-07/R-08, M-04..M-07, A-03..A-06) → Inc 3/4.*
-- [~] **FE-03** Tracking por clicks: solo 3 de 22 features mapeadas.
-  *Avance Inc 2: tracking de cards conservado en `PortalInicio`; mapa completo de acciones → Inc 3/4.*
+  *Inc 3: + anclas R-02 (búsqueda cédula), R-03 (form paciente), M-04 (form historia). Sin ancla aún (paso cae a modal centrado, aceptable): R-05/R-07 (viven dentro del modal de cita), R-08, M-05..M-07, A-03..A-06 (sin UI todavía).*
+- [~] **FE-03** Tracking real por acciones.
+  *Inc 3: visitas → R-01/M-01/A-01 (inicio), R-06/M-02/A-07 (agenda), A-02 (dashboard), M-03 (historias). Acciones → R-02 (buscar), R-03 (crear paciente), R-04/R-05 (cita según canal), R-07 (cancelar con motivo), M-04 (guardar historia), M-05 (con diagnóstico). Mapa legacy botón→feature eliminado (falsos positivos). Sin disparador aún: R-08, M-06, M-07, A-03..A-06 (requieren UI de FT-01/Inc 4).*
 - [x] **FE-04** Portal sin distinción de roles.
   *Resuelto en Inc 2 de FT-04: nav filtrado por rol, rutas con guards por rol (`/portal/citas` recepción+admin, `/portal/historias` médico+admin, `/portal/dashboard` admin), home común `/portal/inicio`. Refinamiento visual de cards por rol → Inc 3.*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).
@@ -71,7 +71,7 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 - [~] **FT-03** Suite de tests: arrancada con `node --test` (sin deps nuevas). 6 tests pasando.
   *Cubre filtro de campos HC (HC-05) y tour.factory. Falta: choque de citas, auth middleware (necesitan mocks de DB).*
 - [~] **FT-04** Partir monolito LoginPage (2300+ líneas) en rutas por rol.
-  *Inc 2/5 hecho: **monolito eliminado**. `LoginForm` en `/login`, `PortalInicio` (home), `CitasFlow` (/portal/citas), `HistoriasFlow` (/portal/historias); tour+tracker viven en `PortalLayout`. Specs/planes: `2026-07-08-portal-split-*`, `2026-07-09-portal-split-inc2-plan.md`. Quedan Inc 3-5 (pulir flujos, feature-ids de acción, vista pacientes).*
+  *Inc 3/5 hecho: monolito eliminado (Inc 2) + tracking real por acciones y anclas de tour (Inc 3). Bonus Inc 3: CitaModal ahora pide sede (CIT-01 — antes crear cita fallaba 400 por schema) y canal (CIT-02/03); cancelar exige motivo (CIT-10). Quedan Inc 4-5 (features M-06/M-07 con UI, vista pacientes, reset password).*
 - [x] **FT-05** JWT: interceptor usa token vigente de Supabase; localStorage se sincroniza en cada refresh.
   *`api.js`, `supabaseClient.ts`.*
 

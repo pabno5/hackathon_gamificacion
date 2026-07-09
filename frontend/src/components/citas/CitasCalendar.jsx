@@ -3,7 +3,8 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { citasAPI, personasAPI, medicosAPI } from '../../service/api';
+import { citasAPI, personasAPI, medicosAPI, sedesAPI } from '../../service/api';
+import { notifyClick } from '../../lib/progressTracker';
 import CitaModal from './CitaModal';
 import './CitasCalendar.css';
 
@@ -17,6 +18,7 @@ const CitasCalendar = () => {
   const [selectedCita, setSelectedCita] = useState(null);
   const [medicos, setMedicos] = useState([]);
   const [pacientes, setPacientes] = useState([]);
+  const [sedes, setSedes] = useState([]);
   const [currentView, setCurrentView] = useState('month');
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -50,9 +52,10 @@ const CitasCalendar = () => {
   // Cargar médicos y pacientes
   const loadData = useCallback(async () => {
     try {
-      const [medicosRes, personasRes] = await Promise.all([
+      const [medicosRes, personasRes, sedesRes] = await Promise.all([
         medicosAPI.getAll(),
-        personasAPI.getAll()
+        personasAPI.getAll(),
+        sedesAPI.getAll({ activas: 'true' })
       ]);
 
       if (medicosRes.data.success) {
@@ -61,6 +64,10 @@ const CitasCalendar = () => {
 
       if (personasRes.data.success) {
         setPacientes(personasRes.data.data);
+      }
+
+      if (sedesRes.data.success) {
+        setSedes(sedesRes.data.data);
       }
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -101,16 +108,21 @@ const CitasCalendar = () => {
         // Crear nueva (con soporte de archivo)
         const response = await citasAPI.create(citaData, file);
         if (response.data.success) {
-          const mensaje = file 
-            ? 'Cita creada exitosamente con documento adjunto' 
+          const mensaje = file
+            ? 'Cita creada exitosamente con documento adjunto'
             : 'Cita creada exitosamente';
           alert(mensaje);
-          
+
+          // Gamificación: agendar presencial (R-04) o callcenter (R-05)
+          try {
+            notifyClick(citaData.canal === 'telefonico' ? 'R-05' : 'R-04');
+          } catch { /* noop */ }
+
           // Mostrar información del documento si se subió
           if (response.data.data?.documento) {
             console.log('Documento subido:', response.data.data.documento);
           }
-          
+
           loadCitas();
         }
       }
@@ -122,21 +134,30 @@ const CitasCalendar = () => {
     }
   };
 
-  // Handler para eliminar cita
+  // Handler para cancelar cita — motivo obligatorio (CIT-10)
   const handleDeleteCita = async (id_cita) => {
-    if (!window.confirm('¿Está seguro de eliminar esta cita?')) return;
+    const motivo = window.prompt('Motivo de la cancelación (obligatorio):');
+    if (motivo === null) return; // usuario canceló el diálogo
+    if (!motivo || motivo.trim().length < 3) {
+      alert('El motivo de cancelación es obligatorio (mínimo 3 caracteres).');
+      return;
+    }
 
     try {
-      const response = await citasAPI.delete(id_cita);
+      const response = await citasAPI.cancelar(id_cita, motivo.trim());
       if (response.data.success) {
-        alert('Cita eliminada exitosamente');
+        alert('Cita cancelada exitosamente');
+
+        // Gamificación: cancelar cita con motivo (R-07)
+        try { notifyClick('R-07'); } catch { /* noop */ }
+
         loadCitas();
         setShowModal(false);
         setSelectedCita(null);
       }
     } catch (error) {
-      console.error('Error al eliminar cita:', error);
-      alert('Error al eliminar la cita');
+      console.error('Error al cancelar cita:', error);
+      alert(error.response?.data?.message || 'Error al cancelar la cita');
     }
   };
 
@@ -271,6 +292,7 @@ const CitasCalendar = () => {
           cita={selectedCita}
           medicos={medicos}
           pacientes={pacientes}
+          sedes={sedes}
           onSave={handleSaveCita}
           onDelete={handleDeleteCita}
           onClose={() => {
