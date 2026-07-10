@@ -30,8 +30,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
   *Resuelto en Inc 2 de FT-04: nav filtrado por rol, rutas con guards por rol (`/portal/citas` recepción+admin, `/portal/historias` médico+admin, `/portal/dashboard` admin), home común `/portal/inicio`. Refinamiento visual de cards por rol → Inc 3.*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).
   *`App.tsx`. Nota: el botón "Agendar" del Navbar público ahora rebota a login — considerar cambiar su destino a la sección de contacto (decisión UX del dueño).*
-- [ ] **FE-06** UI recuperar contraseña (AU-03): endpoint existe; `LoginForm` muestra aviso ("solicita al administrador") en vez de flujo real.
-  *Pendiente — flujo completo requiere página de reset (Supabase redirect + updateUser) → Inc 5.*
+- [x] **FE-06** UI recuperar contraseña (AU-03).
+  *Inc 5: `LoginForm` modo reset envía enlace vía `authAPI.recuperarPassword` (redirectTo `/reset-password`, sin revelar si el correo existe); nueva página `ResetPassword` fija la contraseña con `supabase.auth.updateUser`. Falta probar el ciclo real de correo con backend/Supabase.*
 
 ---
 
@@ -65,13 +65,13 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 ## ⚪ Faltantes (docs + opinión)
 
-- [ ] **FT-01** UI admin CRUD: empleados (ADM-01/02), especialidades/médicos/sedes (A-04/05), auditoría (A-06), reportes (A-07). API existe, UI no.
-  *Pendiente — módulo grande. El dashboard admin actual solo cubre gamificación.*
+- [~] **FT-01** UI admin CRUD: empleados (ADM-01/02), especialidades/médicos/sedes (A-04/05), auditoría (A-06), reportes (A-07). API existe, UI no.
+  *Inc 5: vista `/portal/pacientes` (PAC-05 listar+buscar+paginar) hecha. Falta el CRUD admin propiamente dicho (empleados/especialidades/médicos/sedes/auditoría) — módulo grande aparte.*
 - [x] **FT-02** `ProtectedRoute` creado y aplicado a `/calendario` y `/admin`.
 - [~] **FT-03** Suite de tests: arrancada con `node --test` (sin deps nuevas). 6 tests pasando.
   *Cubre filtro de campos HC (HC-05) y tour.factory. Falta: choque de citas, auth middleware (necesitan mocks de DB).*
-- [~] **FT-04** Partir monolito LoginPage (2300+ líneas) en rutas por rol.
-  *Inc 4/5 hecho: HistoriasFlow con ficha real de paciente — historias del backend (HC-03) con export PDF (HC-06/M-07) e historial de citas (M-06). Demo (GeneratedHistoriaClinica/SchedulingSection) conservada tras "Vista de demostración". Queda Inc 5: vista gestión de pacientes (slice FT-01), reset password (FE-06), UI admin restante (A-03..A-06).*
+- [x] **FT-04** Partir monolito LoginPage (2300+ líneas) en rutas por rol.
+  *5/5 incrementos completos: monolito eliminado; portal con AuthContext + PortalLayout + rutas por rol (`/portal/inicio|dashboard|agenda|citas|pacientes|historias`), tracking real de gamificación, ficha de paciente con PDF, gestión de pacientes y reset de contraseña. Specs/planes en `2026-07-08/09-portal-split-*`. Deuda restante fuera del split: FT-01 (CRUD admin) y verificación runtime autenticada.*
 - [x] **FT-05** JWT: interceptor usa token vigente de Supabase; localStorage se sincroniza en cada refresh.
   *`api.js`, `supabaseClient.ts`.*
 

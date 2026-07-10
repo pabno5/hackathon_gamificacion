@@ -8,6 +8,7 @@ import { AppointmentChatSection } from "./components/AppointmentChatSection";
 import { ChatBot } from "./components/ChatBot";
 import { Footer } from "./components/Footer";
 import LoginForm from "./components/auth/LoginForm";
+import ResetPassword from "./components/auth/ResetPassword";
 import { Toaster } from "./components/ui/sonner";
 import CalendarioPage from "./pages/CalendarioPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -17,6 +18,7 @@ import PortalLayout from "./components/portal/PortalLayout";
 import PortalInicio from "./components/portal/PortalInicio";
 import CitasFlow from "./components/portal/CitasFlow";
 import HistoriasFlow from "./components/portal/HistoriasFlow";
+import PacientesList from "./components/portal/PacientesList";
 import { AuthProvider, useAuth } from "./lib/authContext";
 
 function HomePage() {
@@ -67,6 +69,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPageWrapper />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Portal de empleados: shell + rutas por rol */}
         <Route
@@ -101,6 +104,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={["medico", "admin"]}>
                 <HistoriasFlow />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="pacientes"
+            element={
+              <ProtectedRoute roles={["recepcionista", "admin"]}>
+                <PacientesList />
               </ProtectedRoute>
             }
           />

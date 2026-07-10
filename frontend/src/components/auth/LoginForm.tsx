@@ -6,6 +6,7 @@ import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import logoImage from "../../assets/logo.png";
 import { login } from "../../service/user.service";
+import { authAPI } from "../../service/api";
 import { useAuth } from "../../lib/authContext";
 
 /**
@@ -22,6 +23,8 @@ export default function LoginForm() {
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [modoReset, setModoReset] = useState(false);
+  const [enviandoReset, setEnviandoReset] = useState(false);
 
   // Sesión ya activa → directo al portal
   if (!loading && rol) return <Navigate to="/portal" replace />;
@@ -45,6 +48,29 @@ export default function LoginForm() {
       toast.error("Error al iniciar sesión. Intenta de nuevo.");
     } finally {
       setEnviando(false);
+    }
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!correo) {
+      toast.error("Ingresa tu correo para enviarte el enlace.");
+      return;
+    }
+    setEnviandoReset(true);
+    try {
+      await authAPI.recuperarPassword({
+        email: correo,
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      toast.success("Si el correo existe, te enviamos un enlace para restablecer la contraseña.");
+      setModoReset(false);
+    } catch {
+      // No revelar si el correo existe o no (seguridad)
+      toast.success("Si el correo existe, te enviamos un enlace para restablecer la contraseña.");
+      setModoReset(false);
+    } finally {
+      setEnviandoReset(false);
     }
   };
 
@@ -81,49 +107,85 @@ export default function LoginForm() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="correo" className="text-gray-700">Correo</Label>
-              <Input
-                id="correo"
-                type="email"
-                placeholder="Ingresa tu correo"
-                className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                required
-              />
-            </div>
+          {modoReset ? (
+            <form onSubmit={handleReset} className="space-y-6">
+              <p className="text-sm text-gray-600 text-center">
+                Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="correoReset" className="text-gray-700">Correo</Label>
+                <Input
+                  id="correoReset"
+                  type="email"
+                  placeholder="Ingresa tu correo"
+                  className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-700">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Ingresa tu contraseña"
-                className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                value={contrasena}
-                onChange={(e) => setContrasena(e.target.value)}
-                required
-              />
-            </div>
+              <Button
+                type="submit"
+                disabled={enviandoReset}
+                className="w-full h-12 bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-60"
+              >
+                {enviandoReset ? "Enviando..." : "Enviar enlace"}
+              </Button>
 
-            <Button
-              type="submit"
-              disabled={enviando}
-              className="w-full h-12 bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-60"
-            >
-              {enviando ? "Verificando..." : "Acceder"}
-            </Button>
+              <button
+                type="button"
+                onClick={() => setModoReset(false)}
+                className="w-full text-sm text-[#03D4D9] hover:text-[#01EDDF] transition-colors"
+              >
+                Volver al inicio de sesión
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="correo" className="text-gray-700">Correo</Label>
+                <Input
+                  id="correo"
+                  type="email"
+                  placeholder="Ingresa tu correo"
+                  className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  required
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={() => toast.info("Solicita el restablecimiento de tu contraseña al administrador.")}
-              className="w-full text-sm text-[#03D4D9] hover:text-[#01EDDF] transition-colors"
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
-          </form>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-gray-700">Contraseña</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Ingresa tu contraseña"
+                  className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                  value={contrasena}
+                  onChange={(e) => setContrasena(e.target.value)}
+                  required
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={enviando}
+                className="w-full h-12 bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-60"
+              >
+                {enviando ? "Verificando..." : "Acceder"}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setModoReset(true)}
+                className="w-full text-sm text-[#03D4D9] hover:text-[#01EDDF] transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </form>
+          )}
 
           {/* Footer */}
           <div className="mt-10 pt-8 border-t border-gray-100 text-center">
