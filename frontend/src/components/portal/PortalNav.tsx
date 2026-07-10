@@ -10,6 +10,7 @@ const ITEMS: NavItem[] = [
   { to: "/portal/citas", label: "Citas", roles: ["admin", "recepcionista"] },
   { to: "/portal/pacientes", label: "Pacientes", roles: ["admin", "recepcionista"] },
   { to: "/portal/historias", label: "Historias", roles: ["admin", "medico"] },
+  { to: "/portal/admin", label: "Administración", roles: ["admin"] },
 ];
 
 // data-feature-id ancla el tour (tour.factory emite [data-feature-id="..."]).
@@ -28,6 +29,8 @@ function featureIdFor(to: string, rol: string): string | undefined {
       return rol === "recepcionista" ? "R-02" : undefined;
     case "/portal/historias":
       return rol === "medico" ? "M-03" : undefined;
+    case "/portal/admin":
+      return "A-03";
     default:
       return undefined;
   }

@@ -19,6 +19,7 @@ import PortalInicio from "./components/portal/PortalInicio";
 import CitasFlow from "./components/portal/CitasFlow";
 import HistoriasFlow from "./components/portal/HistoriasFlow";
 import PacientesList from "./components/portal/PacientesList";
+import GestionPage from "./components/portal/admin/GestionPage";
 import { AuthProvider, useAuth } from "./lib/authContext";
 
 function HomePage() {
@@ -112,6 +113,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={["recepcionista", "admin"]}>
                 <PacientesList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <GestionPage />
               </ProtectedRoute>
             }
           />

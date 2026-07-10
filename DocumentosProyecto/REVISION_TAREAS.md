@@ -23,9 +23,9 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 - [x] **FE-01** ChatBot fuera del portal (BOT-01) + subtítulo/saludo corregidos a público.
   *`App.tsx` (quitado de `/login`), `ChatBot.tsx`.*
 - [~] **FE-02** `data-feature-id` en elementos del portal (tour cae a modal centrado).
-  *Inc 4: + anclas M-06 (búsqueda/ficha paciente), M-07 (sección historias con export). Sin ancla aún (fallback modal centrado, aceptable): R-05/R-07 (dentro del modal de cita), R-08, M-05, A-03..A-06 (sin UI — FT-01).*
+  *FT-01: + anclas A-03 (empleados), A-04 (especialidades), A-05 (médicos), A-06 (auditoría). Sin ancla (fallback modal centrado, aceptable): R-05/R-07 (dentro del modal de cita), R-08 (recepción no tiene vista de historia read-only).*
 - [~] **FE-03** Tracking real por acciones.
-  *Inc 4: + M-06 (cargar ficha con historial de citas), M-07 (exportar PDF). Ya cubiertos: R-01..R-07, M-01..M-05, A-01/A-02/A-07. Sin disparador: R-08, A-03..A-06 (requieren UI de FT-01).*
+  *FT-01: + A-03 (crear empleado), A-04 (especialidad), A-05 (médico), A-06 (auditoría). Cubiertos casi todos los 22 features salvo R-08 (sin vista) y A-07 (reportes, sin implementar).*
 - [x] **FE-04** Portal sin distinción de roles.
   *Resuelto en Inc 2 de FT-04: nav filtrado por rol, rutas con guards por rol (`/portal/citas` recepción+admin, `/portal/historias` médico+admin, `/portal/dashboard` admin), home común `/portal/inicio`. Refinamiento visual de cards por rol → Inc 3.*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).
@@ -65,8 +65,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 ## ⚪ Faltantes (docs + opinión)
 
-- [~] **FT-01** UI admin CRUD: empleados (ADM-01/02), especialidades/médicos/sedes (A-04/05), auditoría (A-06), reportes (A-07). API existe, UI no.
-  *Inc 5: vista `/portal/pacientes` (PAC-05 listar+buscar+paginar) hecha. Falta el CRUD admin propiamente dicho (empleados/especialidades/médicos/sedes/auditoría) — módulo grande aparte.*
+- [x] **FT-01** UI admin CRUD.
+  *`/portal/admin` (admin-only) con tabs: Empleados (crear con rol + activar/desactivar + reiniciar tour, ADM-01/02/03), Especialidades (A-04), Sedes (con Google Calendar ID, CIT-06), Médicos (crear + asignar especialidad/sede, A-05), Auditoría (tabla paginada + filtros, A-06). Pacientes ya estaba (PAC-05). Falta solo A-07 (reportes/estadísticas de citas) — no crítico. Desbloquea crear médico/recepcionista para probar roles.*
 - [x] **FT-02** `ProtectedRoute` creado y aplicado a `/calendario` y `/admin`.
 - [~] **FT-03** Suite de tests: arrancada con `node --test` (sin deps nuevas). 6 tests pasando.
   *Cubre filtro de campos HC (HC-05) y tour.factory. Falta: choque de citas, auth middleware (necesitan mocks de DB).*
