@@ -20,6 +20,7 @@ const createCitasModule = require('./src/modules/citas');
 const createGamificacionModule = require('./src/modules/gamificacion');
 const createAuditModule = require('./src/modules/audit');
 const createAgendaModule = require('./src/modules/agenda');
+const createChatbotDocsModule = require('./src/modules/chatbot-docs');
 
 // Shared / infrastructure
 const errorHandler = require('./src/shared/middleware/errorHandler.middleware');
@@ -96,6 +97,7 @@ app.use('/api/v1/empleados', createEmpleadosModule());
 app.use('/api/v1/gamificacion', createGamificacionModule());
 app.use('/api/v1/audit', createAuditModule());
 app.use('/api/v1/agenda', createAgendaModule());
+app.use('/api/v1/chatbot-docs', createChatbotDocsModule());
 
 // Citas: módulo expone repo para listeners de Calendar
 const citasModule = createCitasModule();
