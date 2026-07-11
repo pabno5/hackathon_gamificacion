@@ -16,7 +16,8 @@ const LIMIT = 10;
 export default function PacientesList() {
   const navigate = useNavigate();
   const { rol } = useAuth();
-  const puedeHistorias = rol === "medico" || rol === "admin";
+  // Todos los roles del portal pueden ver historias (recepción en solo lectura).
+  const puedeHistorias = rol === "medico" || rol === "admin" || rol === "recepcionista";
 
   // Buscar paciente = R-02 (visitar la vista de búsqueda)
   useFeatureVisit("R-02");

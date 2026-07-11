@@ -9,7 +9,7 @@ const ITEMS: NavItem[] = [
   { to: "/portal/agenda", label: "Agenda", roles: ["admin", "medico", "recepcionista"] },
   { to: "/portal/citas", label: "Citas", roles: ["admin", "recepcionista"] },
   { to: "/portal/pacientes", label: "Pacientes", roles: ["admin", "recepcionista"] },
-  { to: "/portal/historias", label: "Historias", roles: ["admin", "medico"] },
+  { to: "/portal/historias", label: "Historias", roles: ["admin", "medico", "recepcionista"] },
   { to: "/portal/admin", label: "Administración", roles: ["admin"] },
 ];
 
@@ -28,7 +28,7 @@ function featureIdFor(to: string, rol: string): string | undefined {
     case "/portal/pacientes":
       return rol === "recepcionista" ? "R-02" : undefined;
     case "/portal/historias":
-      return rol === "medico" ? "M-03" : undefined;
+      return rol === "medico" ? "M-03" : rol === "recepcionista" ? "R-08" : undefined;
     case "/portal/admin":
       return "A-03";
     default:

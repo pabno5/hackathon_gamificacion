@@ -22,10 +22,10 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 - [x] **FE-01** ChatBot fuera del portal (BOT-01) + subtítulo/saludo corregidos a público.
   *`App.tsx` (quitado de `/login`), `ChatBot.tsx`.*
-- [~] **FE-02** `data-feature-id` en elementos del portal (tour cae a modal centrado).
-  *FT-01: + anclas A-03 (empleados), A-04 (especialidades), A-05 (médicos), A-06 (auditoría). Sin ancla (fallback modal centrado, aceptable): R-05/R-07 (dentro del modal de cita), R-08 (recepción no tiene vista de historia read-only).*
-- [~] **FE-03** Tracking real por acciones.
-  *FT-01: + A-03 (crear empleado), A-04 (especialidad), A-05 (médico), A-06 (auditoría). Cubiertos casi todos los 22 features salvo R-08 (sin vista) y A-07 (reportes, sin implementar).*
+- [x] **FE-02** `data-feature-id` en elementos del portal.
+  *Anclados los 22 features en nav/vistas/acciones (R-08 = ficha read-only de recepción añadida). Únicas sin ancla propia: R-05/R-07 (viven dentro del modal de cita, que no está montado durante el tour) → fallback modal centrado de driver.js, aceptable.*
+- [x] **FE-03** Tracking real por acciones.
+  *Los 22 features del Anexo A se marcan por uso real. Único sin implementar: A-07 (reportes, no es feature de tour — es vista admin).*
 - [x] **FE-04** Portal sin distinción de roles.
   *Resuelto en Inc 2 de FT-04: nav filtrado por rol, rutas con guards por rol (`/portal/citas` recepción+admin, `/portal/historias` médico+admin, `/portal/dashboard` admin), home común `/portal/inicio`. Refinamiento visual de cards por rol → Inc 3.*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).

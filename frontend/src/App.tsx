@@ -103,7 +103,7 @@ export default function App() {
           <Route
             path="historias"
             element={
-              <ProtectedRoute roles={["medico", "admin"]}>
+              <ProtectedRoute roles={["medico", "admin", "recepcionista"]}>
                 <HistoriasFlow />
               </ProtectedRoute>
             }

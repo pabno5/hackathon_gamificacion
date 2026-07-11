@@ -44,16 +44,22 @@ type Prefill = {
 export default function HistoriasFlow() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, rol } = useAuth();
+
+  // Recepción solo consulta datos básicos (HC-05): ficha de solo lectura,
+  // sin crear/editar historias. El backend ya filtra los campos sensibles.
+  const soloLectura = rol === "recepcionista";
 
   const entrada = (location.state ?? {}) as { paso?: Paso; prefill?: Prefill; documento?: string };
   const prefill = entrada.prefill ?? {};
 
-  // Acceder a historia clínica = M-03 (backend ignora el código para admin)
-  useFeatureVisit("M-03");
+  // Acceder a historia clínica: M-03 (médico/admin) o R-08 (recepción, consulta básica)
+  useFeatureVisit(soloLectura ? "R-08" : "M-03");
 
   const [paso, setPaso] = useState<Paso>(
-    entrada.paso === "formulario" ? "formulario" : entrada.paso === "generar" ? "generar" : "paciente"
+    soloLectura
+      ? "paciente"
+      : entrada.paso === "formulario" ? "formulario" : entrada.paso === "generar" ? "generar" : "paciente"
   );
   const [showGeneratedHistoria, setShowGeneratedHistoria] = useState(false);
 
@@ -404,14 +410,16 @@ export default function HistoriasFlow() {
                   {cargandoFicha ? "Buscando..." : "Buscar paciente"}
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9]/10 rounded-xl transition-colors"
-                  onClick={() => setPaso("formulario")}
-                >
-                  Nueva historia sin buscar
-                </Button>
+                {!soloLectura && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9]/10 rounded-xl transition-colors"
+                    onClick={() => setPaso("formulario")}
+                  >
+                    Nueva historia sin buscar
+                  </Button>
+                )}
               </form>
             </div>
           </motion.div>
@@ -437,12 +445,14 @@ export default function HistoriasFlow() {
                   </p>
                 </div>
                 <div className="flex gap-3 flex-wrap">
-                  <Button
-                    onClick={nuevaHistoriaDePaciente}
-                    className="bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-full px-6"
-                  >
-                    Nueva historia clínica
-                  </Button>
+                  {!soloLectura && (
+                    <Button
+                      onClick={nuevaHistoriaDePaciente}
+                      className="bg-gradient-to-r from-[#01EDDF] to-[#03D4D9] hover:from-[#03D4D9] hover:to-[#01EDDF] text-white rounded-full px-6"
+                    >
+                      Nueva historia clínica
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     className="border-[#03D4D9] text-[#03D4D9] hover:bg-[#03D4D9]/10 rounded-full px-6"
@@ -527,16 +537,18 @@ export default function HistoriasFlow() {
               )}
             </div>
 
-            {/* Acceso a la vista demo original */}
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setPaso("generar")}
-                className="text-sm text-gray-400 hover:text-[#03D4D9] transition-colors"
-              >
-                Vista de demostración
-              </button>
-            </div>
+            {/* Acceso a la vista demo original (no para recepción) */}
+            {!soloLectura && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setPaso("generar")}
+                  className="text-sm text-gray-400 hover:text-[#03D4D9] transition-colors"
+                >
+                  Vista de demostración
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
 
