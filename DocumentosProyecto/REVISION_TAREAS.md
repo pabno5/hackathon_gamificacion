@@ -25,7 +25,7 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 - [x] **FE-02** `data-feature-id` en elementos del portal.
   *Anclados los 22 features en nav/vistas/acciones (R-08 = ficha read-only de recepción añadida). Únicas sin ancla propia: R-05/R-07 (viven dentro del modal de cita, que no está montado durante el tour) → fallback modal centrado de driver.js, aceptable.*
 - [x] **FE-03** Tracking real por acciones.
-  *Los 22 features del Anexo A se marcan por uso real. Único sin implementar: A-07 (reportes, no es feature de tour — es vista admin).*
+  *Los 22 features del Anexo A se marcan por uso real.*
 - [x] **FE-04** Portal sin distinción de roles.
   *Resuelto en Inc 2 de FT-04: nav filtrado por rol, rutas con guards por rol (`/portal/citas` recepción+admin, `/portal/historias` médico+admin, `/portal/dashboard` admin), home común `/portal/inicio`. Refinamiento visual de cards por rol → Inc 3.*
 - [x] **FE-05** `/calendario` protegido con `ProtectedRoute` (sin sesión → /login).
@@ -66,7 +66,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 ## ⚪ Faltantes (docs + opinión)
 
 - [x] **FT-01** UI admin CRUD.
-  *`/portal/admin` (admin-only) con tabs: Empleados (crear con rol + activar/desactivar + reiniciar tour, ADM-01/02/03), Especialidades (A-04), Sedes (con Google Calendar ID, CIT-06), Médicos (crear + asignar especialidad/sede, A-05), Auditoría (tabla paginada + filtros, A-06). Pacientes ya estaba (PAC-05). Falta solo A-07 (reportes/estadísticas de citas) — no crítico. Desbloquea crear médico/recepcionista para probar roles.*
+  *`/portal/admin` (admin-only) con tabs: Empleados (ADM-01/02/03), Especialidades (A-04), Sedes (con Google Calendar ID, CIT-06), Médicos (A-05), Reportes de citas por estado/canal/sede (A-07), Auditoría (A-06). Pacientes aparte (PAC-05). Completo.*
+  *Bugfix de paso: PacientesList y AuditoriaAdmin leían el total de `pagination.total` (inexistente); `ApiResponse.paginated` lo pone en `meta.total` → paginación no aparecía. Corregido.*
 - [x] **FT-02** `ProtectedRoute` creado y aplicado a `/calendario` y `/admin`.
 - [~] **FT-03** Suite de tests: arrancada con `node --test` (sin deps nuevas). 6 tests pasando.
   *Cubre filtro de campos HC (HC-05) y tour.factory. Falta: choque de citas, auth middleware (necesitan mocks de DB).*
@@ -79,9 +80,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 ## Resumen final
 
-**Corregido (17):** SEC-03, FE-01/04/05/06, CL-01..04, BE-04/05/06, FT-01/02/04/05, + FT-03 arrancado.
-**Parcial (2):** FE-02/FE-03 — cubiertos ~20 de 22 features de gamificación; faltan R-08 y A-07.
+**Corregido (21):** SEC-03, FE-01..06, CL-01..04, BE-01/04/05/06, FT-01/02/04/05, + FT-03 arrancado. Los 22 features de gamificación con disparador real.
 **Diferido por decisión (2):** SEC-01, SEC-02 — rotar antes de deploy.
-**Pendiente real (5):** BE-01 (decisión de producto), BE-02, BE-03, A-07, R-08, FT-03 completo.
+**Pendiente real (3):** BE-02 (próxima disponibilidad — falta modelar horarios), BE-03 (sync bidireccional Google Calendar — falta diseño de conflictos), FT-03 completo (más tests con mocks de DB).
 
-**Verificado end-to-end contra la BD viva:** BE-06 (actor en auditoría). El resto del portal fue confirmado por el dueño con un recorrido manual como admin (2026-07-10) — roles médico/recepcionista y varios flujos (crear cita real, export PDF, tour, reset password por correo) siguen sin probar.
+**Verificado end-to-end contra la BD viva:** BE-06 (actor en auditoría). El portal fue confirmado por el dueño con recorrido manual como admin (2026-07-10). Sin probar aún: roles médico/recepcionista y flujos con datos reales (crear cita, export PDF, tour por uso, reset password por correo).

@@ -35,7 +35,7 @@ export default function PacientesList() {
       const res = await personasAPI.getAll({ page, limit: LIMIT, search: search || undefined });
       const body = res.data;
       setPacientes(body?.data ?? []);
-      setTotal(body?.pagination?.total ?? body?.total ?? 0);
+      setTotal(body?.meta?.total ?? 0);
     } catch {
       toast.error("Error al cargar pacientes");
     } finally {

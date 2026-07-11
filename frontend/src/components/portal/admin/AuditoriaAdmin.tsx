@@ -28,7 +28,7 @@ export default function AuditoriaAdmin() {
         accion: accion || undefined,
       });
       setRows(res.data?.data ?? []);
-      setTotal(res.data?.pagination?.total ?? 0);
+      setTotal(res.data?.meta?.total ?? 0);
     } catch {
       toast.error("Error al cargar la auditoría");
     } finally {
