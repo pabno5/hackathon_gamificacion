@@ -5,15 +5,17 @@ import SedesAdmin from "./SedesAdmin";
 import MedicosAdmin from "./MedicosAdmin";
 import AuditoriaAdmin from "./AuditoriaAdmin";
 import ReportesAdmin from "./ReportesAdmin";
+import TurnosAdmin from "./TurnosAdmin";
 
 /** Panel de administración (FT-01) — tabs por entidad. Solo admin (guard en ruta). */
-type Tab = "empleados" | "especialidades" | "sedes" | "medicos" | "reportes" | "auditoria";
+type Tab = "empleados" | "especialidades" | "sedes" | "medicos" | "turnos" | "reportes" | "auditoria";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "empleados", label: "Empleados" },
   { id: "especialidades", label: "Especialidades" },
   { id: "sedes", label: "Sedes" },
   { id: "medicos", label: "Médicos" },
+  { id: "turnos", label: "Turnos" },
   { id: "reportes", label: "Reportes" },
   { id: "auditoria", label: "Auditoría" },
 ];
@@ -48,6 +50,7 @@ export default function GestionPage() {
         {tab === "especialidades" && <EspecialidadesAdmin />}
         {tab === "sedes" && <SedesAdmin />}
         {tab === "medicos" && <MedicosAdmin />}
+        {tab === "turnos" && <TurnosAdmin />}
         {tab === "reportes" && <ReportesAdmin />}
         {tab === "auditoria" && <AuditoriaAdmin />}
       </div>

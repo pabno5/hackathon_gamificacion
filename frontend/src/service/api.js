@@ -188,4 +188,15 @@ export const auditAPI = {
   getAll: (params = {}) => apiV1.get('/audit', { params }),
 };
 
+// ============ AGENDA — turnos y disponibilidad (v1) ============
+export const agendaAPI = {
+  getConfig: () => apiV1.get('/agenda/config'),
+  updateConfig: (data) => apiV1.put('/agenda/config', data),
+  setAlmuerzo: (id_medico, data) => apiV1.put(`/agenda/medicos/${id_medico}/almuerzo`, data),
+  getBloqueos: (params = {}) => apiV1.get('/agenda/bloqueos', { params }),
+  crearBloqueo: (data) => apiV1.post('/agenda/bloqueos', data),
+  eliminarBloqueo: (id) => apiV1.delete(`/agenda/bloqueos/${id}`),
+  disponibilidad: (params = {}) => apiV1.get('/agenda/disponibilidad', { params }),
+};
+
 export default apiV1;
