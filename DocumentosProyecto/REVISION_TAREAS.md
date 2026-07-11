@@ -47,8 +47,8 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 ## 🔵 Backend — mejoras
 
-- [ ] **BE-01** Semántica progreso: el tour marca feature visitada al mostrar el paso → 100% el primer día.
-  *Pendiente — es una DECISIÓN de producto, no un bug. Opciones: (a) el tour no marca visitas y solo el uso real cuenta; (b) la métrica pasa a "tour completado". Definir con el dueño antes de tocar.*
+- [x] **BE-01** Semántica progreso: el tour ya NO marca features al mostrarlas.
+  *Decisión del dueño (2026-07-10): el progreso cuenta uso real, no ver el tour. `tourManager` sin `onHighlightStarted`/`marcarVisitada`; las features se marcan por `useFeatureVisit` (al entrar a la vista) y `notifyClick` (en cada acción). El tour queda como guía pura; `tour.completado` solo apaga `primer_login`.*
 - [ ] **BE-02** CIT-09: `/disponibilidad` lista médicos pero no busca el próximo slot libre.
   *Pendiente — requiere modelar horarios/jornadas del médico (no existen en el schema).*
 - [ ] **BE-03** CIT-07: el cron detecta borrados en Google pero no importa cambios de hora.
@@ -59,7 +59,7 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
   *`busqueda_pdf.py`.*
 - [x] **BE-06** `audit_log.id_empleado` ahora se registra (antes SIEMPRE NULL).
   *Plumbing de actor por transacción: `db.queryAs/withActor/setActor` fijan `set_config('app.current_empleado', ...)` (LOCAL, sobrevive el pooler de Supabase). Trigger lee la GUC. Threaded en las 4 tablas auditadas: pacientes (create/update/delete), historias (create/update), citas (create/update/cancel), empleados (crear/activar/reiniciar-tour/primer-login). Writes de sistema (cron, sync Calendar) → NULL a propósito.*
-  *⚠️ FALTA: correr `backend/scripts/migration_audit_actor.sql` en la BD viva (Supabase SQL Editor) — sin eso, la función desplegada sigue sin la columna. Editar `schema.sql` solo no impacta producción.*
+  *✅ Verificado en vivo: la función desplegada en Supabase ya tiene `current_setting('app.current_empleado')`; probado con INSERT+ROLLBACK real, `id_empleado` quedó correcto en `audit_log`.*
 
 ---
 
@@ -77,11 +77,11 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 ---
 
-## Resumen
+## Resumen final
 
-**Corregido (12):** SEC-03, FE-01, FE-05, CL-01..04, BE-04, BE-05, BE-06, FT-02, FT-05, + FT-03 arrancado.
-**Diferido por decisión (2):** SEC-01, SEC-02 (rotar antes de deploy).
-**Acción manual pendiente:** correr `backend/scripts/migration_audit_actor.sql` en Supabase (parte de BE-06).
-**Pendiente grande (7):** FE-02/03/04/06 y FT-01/04 giran todos alrededor de partir el monolito del portal (FT-04). BE-01 es decisión de producto. BE-02/03 requieren modelado adicional.
+**Corregido (17):** SEC-03, FE-01/04/05/06, CL-01..04, BE-04/05/06, FT-01/02/04/05, + FT-03 arrancado.
+**Parcial (2):** FE-02/FE-03 — cubiertos ~20 de 22 features de gamificación; faltan R-08 y A-07.
+**Diferido por decisión (2):** SEC-01, SEC-02 — rotar antes de deploy.
+**Pendiente real (5):** BE-01 (decisión de producto), BE-02, BE-03, A-07, R-08, FT-03 completo.
 
-**Siguiente paso recomendado:** FT-04 (partir el portal por rol) — desbloquea 5 pendientes de frontend de un solo golpe.
+**Verificado end-to-end contra la BD viva:** BE-06 (actor en auditoría). El resto del portal fue confirmado por el dueño con un recorrido manual como admin (2026-07-10) — roles médico/recepcionista y varios flujos (crear cita real, export PDF, tour, reset password por correo) siguen sin probar.

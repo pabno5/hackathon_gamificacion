@@ -4,7 +4,9 @@
  * - Pasos vienen del backend (GET /gamificacion/tour) según el rol.
  * - Arranca automático si primer_login = true.
  * - NO saltable: sin botón de cierre, sin click en overlay, sin ESC.
- * - Cada paso avanzado marca la feature como visitada en BD.
+ * - El tour SOLO guía; NO marca features como visitadas (BE-01). El progreso
+ *   de gamificación se marca cuando el empleado USA cada feature de verdad
+ *   (useFeatureVisit al entrar a la vista + notifyClick en cada acción).
  * - Al terminar: POST /auth/tour-completado (apaga primer_login).
  *
  * Uso (después de login exitoso, con la vista del portal montada):
@@ -50,14 +52,6 @@ async function api(path: string, init: RequestInit = {}) {
   } catch {
     return null;
   }
-}
-
-async function marcarVisitada(codigo: string) {
-  await api('/gamificacion/visitar', {
-    method: 'POST',
-    body: JSON.stringify({ codigo }),
-  });
-  refreshProgress();
 }
 
 async function marcarTourCompletado() {
@@ -126,14 +120,11 @@ export async function startTour(): Promise<void> {
           description: p.popover.description,
         },
       })),
-      onHighlightStarted: (_el, step) => {
-        // Marca como visitada la feature del paso que se está mostrando
-        const idx = d.getActiveIndex();
-        const paso = pasos[idx ?? 0];
-        if (paso) marcarVisitada(paso.featureId);
-      },
+      // Sin onHighlightStarted: el tour NO marca progreso (BE-01). Las features
+      // se marcan por uso real en cada vista/acción.
       onDestroyed: async () => {
         await marcarTourCompletado();
+        // Refresca por si el empleado ya usó algo mientras recorría el tour.
         refreshProgress();
         resolve();
       },
