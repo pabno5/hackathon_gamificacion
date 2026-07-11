@@ -49,10 +49,10 @@ Estado: `[ ]` pendiente · `[x]` hecho · `[~]` parcial · `[-]` diferido
 
 - [x] **BE-01** Semántica progreso: el tour ya NO marca features al mostrarlas.
   *Decisión del dueño (2026-07-10): el progreso cuenta uso real, no ver el tour. `tourManager` sin `onHighlightStarted`/`marcarVisitada`; las features se marcan por `useFeatureVisit` (al entrar a la vista) y `notifyClick` (en cada acción). El tour queda como guía pura; `tour.completado` solo apaga `primer_login`.*
-- [ ] **BE-02** CIT-09: `/disponibilidad` lista médicos pero no busca el próximo slot libre.
-  *Pendiente — requiere modelar horarios/jornadas del médico (no existen en el schema).*
-- [ ] **BE-03** CIT-07: el cron detecta borrados en Google pero no importa cambios de hora.
-  *Pendiente — requiere diseño de resolución de conflictos (quién gana ante edición en ambos lados).*
+- [x] **BE-02** CIT-09: disponibilidad real por slots.
+  *Config de turnos (jornada global 06:00–17:00 editable, almuerzo por médico, bloqueos) + `GET /agenda/disponibilidad` que computa slots libres = jornada − almuerzo − bloqueos − citas. Lógica pura con 8 tests. UI en tab Turnos. Migración `migration_agenda.sql` aplicada en BD viva. Falta (opcional): surfacear "próximo disponible" dentro del modal de agendar.*
+- [x] **BE-03** Citas del callcenter IA (n8n/Vapi).
+  *`POST /api/v1/callcenter/citas` con API key (X-API-Key), sin login: busca/crea paciente, autocompleta `hora_fin` desde la config, reusa `CitasService.crear` (choque + sync Calendar). Probado end-to-end (201, cita telefónica, cleanup). n8n hace el puente Vapi→endpoint. Contrato en `INTEGRACION_CALLCENTER.md`. El cron de borrados sigue igual.*
 - [x] **BE-04** GAM-08: notificación al empleado al llegar a 100% (toast, una sola vez).
   *`LoginPage.tsx`. La visibilidad admin ya era realtime.*
 - [x] **BE-05** Chatbot CORS por env `CHATBOT_CORS_ORIGINS` (default dev local, ya no `*`).

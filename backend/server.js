@@ -102,6 +102,10 @@ const citasModule = createCitasModule();
 app.use('/api/v1/citas', citasModule.router);
 registerCalendarListeners(citasModule.repo);
 
+// Callcenter (BE-03): endpoint máquina-a-máquina para n8n/Vapi. API key, sin login.
+const buildCallcenterRouter = require('./src/modules/citas/citas.callcenter');
+app.use('/api/v1/callcenter', buildCallcenterRouter(citasModule.service));
+
 // Stats del cron de Calendar
 app.get('/api/v1/calendar/sync-stats', (_req, res) => res.json(calendarCron.getStats()));
 
