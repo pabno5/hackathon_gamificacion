@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
+import { agendaAPI } from '../../service/api';
 import './CitaModal.css';
+
+// Fecha/hora locales (sin toISOString: desplazaría la hora a UTC)
+const localFecha = (d) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const localHora = (d) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onClose }) => {
   const [formData, setFormData] = useState({
@@ -7,7 +18,8 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
     id_medico: '',
     id_sede: '',
     canal: 'presencial',
-    fecha_cita: '',
+    fecha: '',
+    hora: '',
     motivo: '',
     estado: 'pendiente',
     observaciones: '',
@@ -18,6 +30,13 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
 
+  // Turnos disponibles (BE-02): se cargan al elegir médico + fecha.
+  // Si la API falla, `slotsError` degrada a un input de hora manual.
+  const [slots, setSlots] = useState([]);
+  const [cargandoSlots, setCargandoSlots] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
+  const [duracionSlot, setDuracionSlot] = useState(30);
+
   useEffect(() => {
     if (cita) {
       // DEBUG: Ver datos de la cita
@@ -26,14 +45,16 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
       console.log('📍 cita.ubicacion:', cita.ubicacion);
       console.log('🔗 cita.id_documento:', cita.id_documento);
       
+      const dt = cita.fecha_cita ? new Date(cita.fecha_cita) : null;
       setFormData({
         id_paciente: cita.id_paciente || '',
         id_medico: cita.id_medico || '',
         id_sede: cita.id_sede || '',
         canal: cita.canal || 'presencial',
-        fecha_cita: cita.fecha_cita
-          ? new Date(cita.fecha_cita).toISOString().slice(0, 16)
-          : '',
+        fecha: dt ? localFecha(dt) : '',
+        // Al editar, la hora original se conserva como opción aunque el slot
+        // figure ocupado (lo ocupa esta misma cita).
+        hora: dt && cita.id_cita ? localHora(dt) : '',
         motivo: cita.motivo || '',
         estado: cita.estado || 'pendiente',
         observaciones: cita.observaciones || '',
@@ -67,6 +88,44 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
       setFilePreview(null);
     }
   }, [cita]);
+
+  // Cargar turnos libres del médico para la fecha elegida (BE-02)
+  useEffect(() => {
+    if (!formData.id_medico || !formData.fecha) {
+      setSlots([]);
+      return;
+    }
+    let vigente = true;
+    (async () => {
+      setCargandoSlots(true);
+      setSlotsError(false);
+      try {
+        const res = await agendaAPI.disponibilidad({
+          id_medico: formData.id_medico,
+          fecha: formData.fecha,
+          dias: 1,
+        });
+        if (!vigente) return;
+        const data = res.data?.data;
+        setDuracionSlot(data?.duracion_slot_min || 30);
+        const libres = data?.medicos?.[0]?.disponibilidad?.[0]?.slots ?? [];
+        // Al editar: la hora original de ESTA cita cuenta como ocupada en el
+        // backend; se re-agrega como opción para poder dejarla igual.
+        const horaOriginal = cita?.id_cita && cita?.fecha_cita &&
+          localFecha(new Date(cita.fecha_cita)) === formData.fecha
+          ? localHora(new Date(cita.fecha_cita))
+          : null;
+        const set = new Set(libres);
+        if (horaOriginal) set.add(horaOriginal);
+        setSlots(Array.from(set).sort());
+      } catch {
+        if (vigente) setSlotsError(true); // degrada a hora manual
+      } finally {
+        if (vigente) setCargandoSlots(false);
+      }
+    })();
+    return () => { vigente = false; };
+  }, [formData.id_medico, formData.fecha, cita]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -148,8 +207,12 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
       newErrors.id_sede = 'Debe seleccionar una sede';
     }
 
-    if (!formData.fecha_cita) {
-      newErrors.fecha_cita = 'Debe seleccionar una fecha y hora';
+    if (!formData.fecha) {
+      newErrors.fecha = 'Debe seleccionar una fecha';
+    }
+
+    if (!formData.hora) {
+      newErrors.hora = 'Debe seleccionar una hora';
     }
 
     if (!formData.motivo || formData.motivo.trim() === '') {
@@ -175,16 +238,18 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
       }));
     }
 
-    // Enviar fecha tal como está (sin conversión a UTC)
-    // El formato datetime-local ya está en formato ISO: "2025-10-29T14:07"
-    // Agregamos ":00" para los segundos si no están
-    const fechaFormateada = formData.fecha_cita.length === 16 
-      ? `${formData.fecha_cita}:00` 
-      : formData.fecha_cita;
+    // hora_fin = hora elegida + duración del slot (config de turnos)
+    const [h, m] = formData.hora.split(':').map(Number);
+    const finMin = h * 60 + m + duracionSlot;
+    const pad = (n) => String(n).padStart(2, '0');
+    const hora_fin = `${pad(Math.floor(finMin / 60) % 24)}:${pad(finMin % 60)}`;
 
+    const { fecha, hora, ...resto } = formData;
     const dataToSend = {
-      ...formData,
-      fecha_cita: fechaFormateada,
+      ...resto,
+      fecha_cita: `${fecha}T${hora}:00`,
+      hora_inicio: hora,
+      hora_fin,
     };
 
     // Pasar datos y archivo al parent component
@@ -285,18 +350,63 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
           </div>
 
           <div className="form-group">
-            <label htmlFor="fecha_cita">
-              Fecha y Hora <span className="required">*</span>
+            <label htmlFor="fecha">
+              Fecha <span className="required">*</span>
             </label>
             <input
-              type="datetime-local"
-              id="fecha_cita"
-              name="fecha_cita"
-              value={formData.fecha_cita}
+              type="date"
+              id="fecha"
+              name="fecha"
+              value={formData.fecha}
               onChange={handleChange}
-              className={errors.fecha_cita ? 'error' : ''}
+              className={errors.fecha ? 'error' : ''}
             />
-            {errors.fecha_cita && <span className="error-message">{errors.fecha_cita}</span>}
+            {errors.fecha && <span className="error-message">{errors.fecha}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="hora">
+              Hora <span className="required">*</span>
+            </label>
+            {slotsError ? (
+              // La API de turnos falló: hora manual como fallback
+              <input
+                type="time"
+                id="hora"
+                name="hora"
+                value={formData.hora}
+                onChange={handleChange}
+                className={errors.hora ? 'error' : ''}
+              />
+            ) : (
+              <select
+                id="hora"
+                name="hora"
+                value={formData.hora}
+                onChange={handleChange}
+                disabled={!formData.id_medico || !formData.fecha || cargandoSlots}
+                className={errors.hora ? 'error' : ''}
+              >
+                <option value="">
+                  {!formData.id_medico || !formData.fecha
+                    ? 'Selecciona médico y fecha primero'
+                    : cargandoSlots
+                      ? 'Cargando turnos...'
+                      : slots.length === 0
+                        ? 'Sin turnos disponibles ese día'
+                        : 'Selecciona un turno'}
+                </option>
+                {slots.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            )}
+            {errors.hora && <span className="error-message">{errors.hora}</span>}
+            {!slotsError && formData.id_medico && formData.fecha && !cargandoSlots && (
+              <small className="form-hint">
+                Turnos libres del médico (jornada, almuerzo y bloqueos ya descontados) · {duracionSlot} min por cita
+              </small>
+            )}
           </div>
 
           <div className="form-group">
