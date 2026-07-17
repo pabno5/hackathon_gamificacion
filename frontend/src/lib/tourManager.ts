@@ -58,6 +58,55 @@ async function marcarTourCompletado() {
   await api('/auth/tour-completado', { method: 'POST' });
 }
 
+/**
+ * Features cuya ancla vive dentro de una vista que NO está montada durante
+ * el tour (forms condicionales de CitasFlow/HistoriasFlow/admin) o que aún
+ * no tiene data-feature-id en el frontend. Fallback: anclar el paso al ítem
+ * del nav de la sección donde se usa la feature (data-tour-nav en PortalNav).
+ */
+const NAV_FALLBACK: Record<string, { ruta: string; seccion: string }> = {
+  'R-03': { ruta: '/portal/citas', seccion: 'Citas' },
+  'R-05': { ruta: '/portal/citas', seccion: 'Citas' },
+  'R-07': { ruta: '/portal/agenda', seccion: 'Agenda' },
+  'M-04': { ruta: '/portal/historias', seccion: 'Historias' },
+  'M-05': { ruta: '/portal/historias', seccion: 'Historias' },
+  'M-06': { ruta: '/portal/historias', seccion: 'Historias' },
+  'M-07': { ruta: '/portal/historias', seccion: 'Historias' },
+  'A-04': { ruta: '/portal/admin', seccion: 'Administración' },
+  'A-05': { ruta: '/portal/admin', seccion: 'Administración' },
+  'A-06': { ruta: '/portal/admin', seccion: 'Administración' },
+};
+
+type PasoResuelto = { element: string; title: string; description: string };
+
+/**
+ * Resuelve el selector de cada paso contra el DOM actual. Si el elemento no
+ * existe, ancla al ítem del nav de su sección; si tampoco existe, descarta el
+ * paso (driver.js lo mostraría como modal centrado "flotante").
+ */
+function resolverPasos(pasos: PasoBackend[]): PasoResuelto[] {
+  const resueltos: PasoResuelto[] = [];
+  for (const p of pasos) {
+    if (document.querySelector(p.element)) {
+      resueltos.push({ element: p.element, title: p.popover.title, description: p.popover.description });
+      continue;
+    }
+    const fb = NAV_FALLBACK[p.featureId];
+    if (fb) {
+      const sel = `[data-tour-nav="${fb.ruta}"]`;
+      if (document.querySelector(sel)) {
+        resueltos.push({
+          element: sel,
+          title: p.popover.title,
+          description: `${p.popover.description}. La encontrarás en la sección «${fb.seccion}».`,
+        });
+        continue;
+      }
+    }
+  }
+  return resueltos;
+}
+
 // Colores del design system (UIUX.md)
 const TOUR_STYLE_ID = 'cv-tour-style';
 function injectTourStyles() {
@@ -96,7 +145,8 @@ function injectTourStyles() {
  */
 export async function startTour(): Promise<void> {
   const body = await api('/gamificacion/tour');
-  const pasos: PasoBackend[] = body?.data?.pasos || [];
+  const pasosBackend: PasoBackend[] = body?.data?.pasos || [];
+  const pasos = resolverPasos(pasosBackend);
   if (pasos.length === 0) return;
 
   injectTourStyles();
@@ -116,8 +166,8 @@ export async function startTour(): Promise<void> {
       steps: pasos.map((p) => ({
         element: p.element,
         popover: {
-          title: p.popover.title,
-          description: p.popover.description,
+          title: p.title,
+          description: p.description,
         },
       })),
       // Sin onHighlightStarted: el tour NO marca progreso (BE-01). Las features

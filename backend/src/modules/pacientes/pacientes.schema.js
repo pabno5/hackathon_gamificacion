@@ -9,6 +9,7 @@ const crear = z.object({
   apellidos: z.string().trim().min(2).max(100),
   fecha_nacimiento: z.string().date().optional().nullable(),
   telefono: z.string().trim().min(7).max(20).optional().nullable(),
+  telefono_emergencia: z.string().trim().min(7).max(20).optional().nullable(),
   correo: z.string().email().optional().nullable(),
   direccion: z.string().max(200).optional().nullable(),
 });

@@ -13,13 +13,13 @@ const pool = getPool();
 const COLS_P = `
   p.id_persona, p.tipo_documento, p.numero_documento,
   p.nombres, p.apellidos, p.fecha_nacimiento, p.telefono,
-  p.correo, p.direccion, p.created_at, p.updated_at
+  p.telefono_emergencia, p.correo, p.direccion, p.created_at, p.updated_at
 `;
 // Columnas sin alias para INSERT/UPDATE RETURNING
 const COLS_PLAIN = `
   id_persona, tipo_documento, numero_documento,
   nombres, apellidos, fecha_nacimiento, telefono,
-  correo, direccion, created_at, updated_at
+  telefono_emergencia, correo, direccion, created_at, updated_at
 `;
 
 class PacientesRepository {
@@ -87,8 +87,8 @@ class PacientesRepository {
     const sql = `
       INSERT INTO personas (
         tipo_documento, numero_documento, nombres, apellidos,
-        fecha_nacimiento, telefono, correo, direccion, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        fecha_nacimiento, telefono, telefono_emergencia, correo, direccion, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING ${COLS_PLAIN}
     `;
     const { rows } = await queryAs(createdBy, sql, [
@@ -98,6 +98,7 @@ class PacientesRepository {
       data.apellidos,
       data.fecha_nacimiento || null,
       data.telefono || null,
+      data.telefono_emergencia || null,
       data.correo || null,
       data.direccion || null,
       createdBy,
@@ -115,6 +116,7 @@ class PacientesRepository {
       'apellidos',
       'fecha_nacimiento',
       'telefono',
+      'telefono_emergencia',
       'correo',
       'direccion',
     ]) {

@@ -19,6 +19,7 @@ CREATE TABLE personas (
     apellidos        VARCHAR(100) NOT NULL,
     fecha_nacimiento DATE,
     telefono         VARCHAR(20),
+    telefono_emergencia VARCHAR(20),
     correo           VARCHAR(150),
     direccion        VARCHAR(200),
     created_at       TIMESTAMP DEFAULT NOW() NOT NULL,

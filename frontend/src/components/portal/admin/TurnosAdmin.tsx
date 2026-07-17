@@ -22,7 +22,42 @@ export default function TurnosAdmin() {
   const [bloqueos, setBloqueos] = useState<any[]>([]);
   const [nuevoBloqueo, setNuevoBloqueo] = useState({ fecha: "", hora_inicio: "", hora_fin: "", motivo: "" });
 
+  // Vista de turnos del día (los "turnos registrados" del médico)
+  const hoy = new Date().toISOString().slice(0, 10);
+  const [fechaTurnos, setFechaTurnos] = useState(hoy);
+  const [slotsLibres, setSlotsLibres] = useState<string[] | null>(null);
+  const [cargandoTurnos, setCargandoTurnos] = useState(false);
+
   const hhmm = (t?: string) => (t ? String(t).slice(0, 5) : "");
+
+  // Todos los slots de la jornada (para pintar libres vs ocupados)
+  const todosLosSlots = (() => {
+    const [hi, mi] = cfg.jornada_inicio.split(":").map(Number);
+    const [hf, mf] = cfg.jornada_fin.split(":").map(Number);
+    const dur = cfg.duracion_slot_min || 30;
+    const out: string[] = [];
+    for (let t = hi * 60 + mi; t + dur <= hf * 60 + mf; t += dur) {
+      out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+    }
+    return out;
+  })();
+
+  const cargarTurnos = useCallback(async (id: string, fecha: string) => {
+    setCargandoTurnos(true);
+    try {
+      const res = await agendaAPI.disponibilidad({ id_medico: id, fecha, dias: 1 });
+      setSlotsLibres(res.data?.data?.medicos?.[0]?.disponibilidad?.[0]?.slots ?? []);
+    } catch {
+      setSlotsLibres(null);
+      toast.error("No se pudieron cargar los turnos del médico");
+    } finally {
+      setCargandoTurnos(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (idMedico && fechaTurnos) cargarTurnos(idMedico, fechaTurnos);
+  }, [idMedico, fechaTurnos, cargarTurnos]);
 
   const cargarBase = useCallback(async () => {
     try {
@@ -141,6 +176,55 @@ export default function TurnosAdmin() {
 
       {idMedico && (
         <div className="space-y-8">
+          {/* Turnos del día: grilla libre/ocupado calculada con la jornada global
+              y la disponibilidad real del médico (almuerzo, bloqueos y citas). */}
+          <div className="bg-gray-50 rounded-2xl p-6">
+            <h3 className="text-sm uppercase tracking-wide text-gray-500 mb-3">Turnos del día</h3>
+            <div className="flex gap-4 items-end mb-4" style={{ flexWrap: "wrap" }}>
+              <div className="space-y-2">
+                <Label>Fecha</Label>
+                <Input type="date" value={fechaTurnos} onChange={(e) => setFechaTurnos(e.target.value)} />
+              </div>
+              <div className="flex gap-3 items-center text-xs text-gray-500 pb-2">
+                <span className="flex items-center gap-1">
+                  <span style={{ width: 12, height: 12, borderRadius: 4, background: "#03D4D9", display: "inline-block" }} /> Libre
+                </span>
+                <span className="flex items-center gap-1">
+                  <span style={{ width: 12, height: 12, borderRadius: 4, background: "#d1d5db", display: "inline-block" }} /> No disponible
+                </span>
+              </div>
+            </div>
+            {cargandoTurnos ? (
+              <p className="text-sm text-gray-400">Cargando turnos...</p>
+            ) : slotsLibres === null ? (
+              <p className="text-sm text-gray-400">No se pudo consultar la disponibilidad.</p>
+            ) : todosLosSlots.length === 0 ? (
+              <p className="text-sm text-gray-400">La jornada configurada no genera turnos.</p>
+            ) : (
+              <div className="flex gap-2" style={{ flexWrap: "wrap" }}>
+                {todosLosSlots.map((s) => {
+                  const libre = slotsLibres.includes(s);
+                  return (
+                    <span
+                      key={s}
+                      title={libre ? "Turno libre" : "Ocupado, almuerzo o bloqueado"}
+                      className="text-sm px-4 py-2 rounded-full"
+                      style={{
+                        background: libre ? "#03D4D9" : "#e5e7eb",
+                        color: libre ? "#fff" : "#9ca3af",
+                      }}
+                    >
+                      {s}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-3">
+              Cada turno dura {cfg.duracion_slot_min} min. Los grises están tomados por citas, almuerzo o bloqueos.
+            </p>
+          </div>
+
           {/* Almuerzo */}
           <div className="bg-gray-50 rounded-2xl p-6">
             <h3 className="text-sm uppercase tracking-wide text-gray-500 mb-3">Hora de almuerzo</h3>

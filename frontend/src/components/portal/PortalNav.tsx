@@ -47,6 +47,7 @@ export default function PortalNav() {
           key={i.to}
           to={i.to}
           data-feature-id={featureIdFor(i.to, rol)}
+          data-tour-nav={i.to}
           className={({ isActive }) =>
             `px-4 py-2 rounded-full text-sm transition-colors ${
               isActive ? "bg-[#03D4D9] text-white" : "text-gray-600 hover:bg-gray-100"

@@ -48,6 +48,7 @@ export default function CitasFlow() {
     apellidos: "",
     fecha_nacimiento: "",
     telefono: "",
+    telefono_emergencia: "",
     direccion: "",
     correoPaciente: "",
     sede: "",
@@ -146,6 +147,7 @@ export default function CitasFlow() {
             apellidos: citasFormData.apellidos,
             fecha_nacimiento: citasFormData.fecha_nacimiento,
             telefono: citasFormData.telefono,
+            telefono_emergencia: citasFormData.telefono_emergencia,
             direccion: citasFormData.direccion,
             correo: citasFormData.correoPaciente,
           });
@@ -467,6 +469,34 @@ export default function CitasFlow() {
                   />
                 </div>
 
+                {/* Contacto de emergencia: nombre + número juntos */}
+                <div className="space-y-2">
+                  <Label htmlFor="acompanante" className="text-gray-700">Nombre del contacto de emergencia*</Label>
+                  <Input
+                    id="acompanante"
+                    type="text"
+                    placeholder="Nombre del familiar o acudiente"
+                    className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                    value={citasFormData.acompanante}
+                    onChange={(e) => setCitasFormData({ ...citasFormData, acompanante: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="telefonoEmergencia" className="text-gray-700">Teléfono del contacto de emergencia*</Label>
+                  <Input
+                    id="telefonoEmergencia"
+                    type="tel"
+                    placeholder="Número del familiar o acudiente"
+                    className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
+                    value={citasFormData.telefono_emergencia}
+                    onChange={(e) => setCitasFormData({ ...citasFormData, telefono_emergencia: e.target.value })}
+                    required
+                    minLength={7}
+                  />
+                </div>
+
                 {/* Selección de sede */}
                 <div className="space-y-2">
                   <Label htmlFor="sede" className="text-gray-700">Selección de sede*</Label>
@@ -531,19 +561,6 @@ export default function CitasFlow() {
                   </Select>
                 </div>
 
-                {/* Acompañante a contactar */}
-                <div className="space-y-2">
-                  <Label htmlFor="acompanante" className="text-gray-700">Acompañante a contactar*</Label>
-                  <Input
-                    id="acompanante"
-                    type="text"
-                    placeholder="Nombre del acompañante"
-                    className="h-12 border-gray-200 focus:border-[#03D4D9] focus:ring-[#03D4D9] rounded-xl"
-                    value={citasFormData.acompanante}
-                    onChange={(e) => setCitasFormData({ ...citasFormData, acompanante: e.target.value })}
-                    required
-                  />
-                </div>
               </div>
 
               {/* ADRES Button */}

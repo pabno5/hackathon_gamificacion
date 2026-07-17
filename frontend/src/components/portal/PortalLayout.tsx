@@ -59,7 +59,9 @@ export default function PortalLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-[#01EDDF]/5">
-      <header className="bg-white shadow-sm sticky top-0 z-40">
+      {/* z-50 (no z-40): index.css es Tailwind precompilado del export de Figma
+          y solo trae las clases del monolito original — .z-40 no existe ahí. */}
+      <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20 gap-4">
           <div className="flex items-center gap-4">
             <img src={logoImage} alt="Cárdenas Visión" className="h-12 w-auto" />
