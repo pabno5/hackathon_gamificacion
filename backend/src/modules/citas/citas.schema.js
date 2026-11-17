@@ -33,6 +33,8 @@ const actualizar = z.object({
   hora_fin: hora.optional(),
   motivo: z.string().max(255).optional().nullable(),
   estado: estado.optional(),
+  // Obligatorio (lo exige el service) cuando `estado` pasa a "cancelada".
+  motivo_cancelacion: z.string().trim().min(3).max(500).optional(),
 });
 
 const cancelar = z.object({

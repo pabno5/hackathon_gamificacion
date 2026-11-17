@@ -107,6 +107,13 @@ const CitasCalendar = () => {
   const handleSaveCita = async (citaData, file = null) => {
     try {
       if (selectedCita?.id_cita) {
+        // Elegir "Cancelada" en el selector de estado es cancelar la cita: se pide
+        // el motivo (CIT-10) igual que con el botón de cancelar. El backend
+        // rechaza una cancelación sin motivo.
+        if (citaData.estado === 'cancelada' && selectedCita.estado !== 'cancelada') {
+          await handleDeleteCita(selectedCita.id_cita);
+          return;
+        }
         // Actualizar (sin soporte de archivo por ahora)
         const response = await citasAPI.update(selectedCita.id_cita, citaData);
         if (response.data.success) {

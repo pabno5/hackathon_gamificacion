@@ -127,7 +127,15 @@ class CitasRepository {
     return await this.findById(idCita);
   }
 
-  async update(id, data, updatedBy) {
+  /**
+   * Actualiza una cita.
+   *
+   * `choque` (opcional) = { id_medico, fecha_cita, hora_inicio, hora_fin } con los
+   * valores FINALES de la cita. Si viene, el choque de horario se verifica dentro
+   * de la misma transacción del UPDATE, serializada por médico+fecha con el mismo
+   * advisory lock que usa `create`. Lanza ConflictError si el turno está ocupado.
+   */
+  async update(id, data, updatedBy, choque = null) {
     const sets = [];
     const vals = [];
     let idx = 1;
@@ -141,12 +149,35 @@ class CitasRepository {
     if (sets.length === 0) return await this.findById(id);
     sets.push(`updated_by = $${idx++}`); vals.push(updatedBy);
     vals.push(id);
-    const { rowCount } = await queryAs(
-      updatedBy,
-      `UPDATE citas SET ${sets.join(', ')}
-        WHERE id_cita = $${idx} AND deleted_at IS NULL`,
-      vals
-    );
+    const sqlUpdate = `UPDATE citas SET ${sets.join(', ')}
+        WHERE id_cita = $${idx} AND deleted_at IS NULL`;
+
+    let rowCount;
+    if (choque) {
+      rowCount = await withActor(updatedBy, async (client) => {
+        await client.query(
+          'SELECT pg_advisory_xact_lock(hashtext($1))',
+          [`cita:${choque.id_medico}:${choque.fecha_cita}`]
+        );
+        const ocupado = await client.query(
+          `SELECT 1 FROM citas
+            WHERE id_medico = $1
+              AND fecha_cita = $2
+              AND deleted_at IS NULL
+              AND estado NOT IN ('cancelada', 'no_asistio')
+              AND (hora_inicio, hora_fin) OVERLAPS ($3::time, $4::time)
+              AND id_cita <> $5
+            LIMIT 1`,
+          [choque.id_medico, choque.fecha_cita, choque.hora_inicio, choque.hora_fin, id]
+        );
+        if (ocupado.rowCount > 0) {
+          throw new ConflictError('El médico ya tiene una cita en ese horario');
+        }
+        return (await client.query(sqlUpdate, vals)).rowCount;
+      });
+    } else {
+      ({ rowCount } = await queryAs(updatedBy, sqlUpdate, vals));
+    }
     if (rowCount === 0) return null;
     return await this.findById(id);
   }
