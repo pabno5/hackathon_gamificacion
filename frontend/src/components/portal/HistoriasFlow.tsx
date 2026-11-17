@@ -15,6 +15,7 @@ import { useAuth } from "../../lib/authContext";
 import { notifyClick } from "../../lib/progressTracker";
 import useFeatureVisit from "../../lib/useFeatureVisit";
 import { personasAPI, historiasClinicasAPI, citasAPI } from "../../service/api";
+import { hoyLocal } from "../../lib/fechas";
 
 /**
  * Flujo de historia clínica — extraído de las vistas historiaClinica /
@@ -88,7 +89,7 @@ export default function HistoriasFlow() {
     direccion: prefill.direccion ?? "",
     telefono: prefill.telefono ?? "",
     ocupacion: "",
-    fechaElaboracion: new Date().toISOString().split('T')[0],
+    fechaElaboracion: hoyLocal(),
     // 2. Motivo de consulta
     motivoConsulta: "",
     // 3. Enfermedad actual
@@ -137,7 +138,7 @@ export default function HistoriasFlow() {
     nombreMedico: "",
     especialidadMedico: "",
     registroProfesional: "",
-    fechaFirma: new Date().toISOString().split('T')[0]
+    fechaFirma: hoyLocal()
   });
 
   /** Busca paciente por documento y carga historias + citas reales. */

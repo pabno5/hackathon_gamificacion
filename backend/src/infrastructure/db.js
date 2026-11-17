@@ -6,8 +6,16 @@
  *
  * Tamaño máx: 10 (suficiente para un Express monolito en Railway free).
  */
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 require('dotenv').config();
+
+// Las columnas DATE (fecha_cita, fecha_nacimiento, bloqueos.fecha…) se devuelven
+// como texto 'YYYY-MM-DD', no como objeto Date. Por defecto `pg` las convierte a
+// medianoche en la zona horaria del servidor, y al serializarlas a JSON (UTC) la
+// fecha podía correrse un día según dónde corriera el servidor. Además, el
+// cliente de Google Calendar concatenaba ese Date como texto y generaba una
+// fecha inválida. Una fecha sin hora no tiene zona: se trata como texto.
+types.setTypeParser(types.builtins.DATE, (valor) => valor);
 
 let pool = null;
 

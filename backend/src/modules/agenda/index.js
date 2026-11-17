@@ -5,7 +5,8 @@ const ApiResponse = require('../../shared/response/ApiResponse');
 const { requireAuth } = require('../../shared/middleware/auth.middleware');
 const { requireRol } = require('../../shared/middleware/role.middleware');
 const { ValidationError, NotFoundError } = require('../../shared/errors/AppError');
-const { calcularSlotsLibres } = require('../citas/disponibilidad.logic');
+const { calcularSlotsLibres, aMin } = require('../citas/disponibilidad.logic');
+const { ahoraEnZona, esFechaValida, sumarDias } = require('../../shared/utils/fechas');
 
 const pool = getPool();
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
@@ -113,7 +114,12 @@ function createAgendaModule() {
   // GET /disponibilidad?id_medico=&id_especialidad=&id_sede=&fecha=&dias=
   router.get('/disponibilidad', asyncHandler(async (req, res) => {
     const { id_medico, id_especialidad, id_sede } = req.query;
-    const fechaBase = req.query.fecha || new Date().toISOString().slice(0, 10);
+    // "Hoy" y "ahora" en la zona de la clínica, no en UTC del servidor.
+    const ahora = ahoraEnZona();
+    const fechaBase = req.query.fecha || ahora.fecha;
+    if (!esFechaValida(fechaBase)) {
+      throw new ValidationError('fecha debe tener formato YYYY-MM-DD');
+    }
     const dias = Math.min(14, Math.max(1, parseInt(req.query.dias, 10) || 5));
 
     const cfg = (await pool.query('SELECT * FROM configuracion_agenda WHERE id = 1')).rows[0];
@@ -124,7 +130,12 @@ function createAgendaModule() {
     const medParams = [];
     if (id_medico) { medParams.push(id_medico); medWhere.push(`m.id_medico = $${medParams.length}`); }
     if (id_especialidad) { medParams.push(id_especialidad); medWhere.push(`mesp.id_especialidad = $${medParams.length}`); }
-    if (id_sede) { medParams.push(id_sede); medWhere.push(`ms.id_sede = $${medParams.length}`); }
+    if (id_sede) {
+      medParams.push(id_sede);
+      // `ms.activo`: quitar a un médico de una sede es un borrado lógico; sin este
+      // filtro seguía apareciendo disponible en la sede de la que fue retirado.
+      medWhere.push(`ms.id_sede = $${medParams.length} AND ms.activo = TRUE`);
+    }
 
     const { rows: medicos } = await pool.query(
       `SELECT DISTINCT m.id_medico, m.almuerzo_inicio, m.almuerzo_fin,
@@ -138,11 +149,9 @@ function createAgendaModule() {
       medParams
     );
 
-    const fechas = Array.from({ length: dias }, (_, i) => {
-      const d = new Date(`${fechaBase}T00:00:00`);
-      d.setDate(d.getDate() + i);
-      return d.toISOString().slice(0, 10);
-    });
+    const fechas = Array.from({ length: dias }, (_, i) => sumarDias(fechaBase, i));
+    const durSlot = Number(cfg.duracion_slot_min) || 30;
+    const minutoActual = aMin(ahora.hora);
     const fechaFin = fechas[fechas.length - 1];
 
     const resultado = [];
@@ -165,7 +174,9 @@ function createAgendaModule() {
       ]);
 
       const dispPorFecha = fechas.map((fecha) => {
-        const slots = calcularSlotsLibres({
+        // Días ya pasados no tienen disponibilidad.
+        if (fecha < ahora.fecha) return { fecha, slots: [] };
+        let slots = calcularSlotsLibres({
           jornadaInicio: cfg.jornada_inicio,
           jornadaFin: cfg.jornada_fin,
           duracionMin: cfg.duracion_slot_min,
@@ -173,6 +184,11 @@ function createAgendaModule() {
           bloqueos: bloqueos.filter((b) => b.fecha === fecha),
           ocupados: citas.filter((c) => c.fecha === fecha),
         });
+        // Hoy: se ocultan los turnos que ya terminaron. El turno en curso se
+        // conserva para poder registrar a un paciente que acaba de llegar.
+        if (fecha === ahora.fecha) {
+          slots = slots.filter((s) => aMin(s) + durSlot > minutoActual);
+        }
         return { fecha, slots };
       });
 

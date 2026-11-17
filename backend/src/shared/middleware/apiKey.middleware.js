@@ -1,4 +1,12 @@
+const crypto = require('crypto');
 const { UnauthorizedError } = require('../errors/AppError');
+
+/** Comparación en tiempo constante: no filtra por timing cuántos caracteres coinciden. */
+function iguales(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 
 /**
  * Autenticación por API key para integraciones máquina-a-máquina (BE-03: el
@@ -15,7 +23,7 @@ function requireApiKey(envVar) {
     if (!expected) {
       return next(new UnauthorizedError('Integración no configurada'));
     }
-    if (!provided || provided !== expected) {
+    if (typeof provided !== 'string' || !iguales(provided, expected)) {
       return next(new UnauthorizedError('API key inválida'));
     }
     next();

@@ -26,18 +26,27 @@ const CitasCalendar = () => {
   const loadCitas = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await citasAPI.getAll();
-      
+      // getTodas recorre la paginación: getAll() solo traía las 20 citas más
+      // recientes y el resto no aparecía en el calendario.
+      const response = await citasAPI.getTodas();
+
       if (response.data.success) {
         // Transformar citas a formato de eventos del calendario
-        const citasEvents = response.data.data.map(cita => ({
-          id: cita.id_cita,
-          title: `${cita.motivo || 'Cita médica'}`,
-          start: new Date(cita.fecha_cita),
-          end: new Date(new Date(cita.fecha_cita).getTime() + 60 * 60 * 1000), // +1 hora
-          resource: cita,
-          estado: cita.estado,
-        }));
+        const citasEvents = response.data.data.map(cita => {
+          const start = new Date(cita.fecha_cita);
+          // Fin real de la cita (hora_fin); +30 min solo si no viene.
+          const end = cita.fecha_fin
+            ? new Date(cita.fecha_fin)
+            : new Date(start.getTime() + 30 * 60 * 1000);
+          return {
+            id: cita.id_cita,
+            title: `${cita.motivo || 'Cita médica'}`,
+            start,
+            end,
+            resource: cita,
+            estado: cita.estado,
+          };
+        });
         
         setEvents(citasEvents);
       }
@@ -54,7 +63,7 @@ const CitasCalendar = () => {
     try {
       const [medicosRes, personasRes, sedesRes] = await Promise.all([
         medicosAPI.getAll(),
-        personasAPI.getAll(),
+        personasAPI.getTodos(), // todas las páginas: el selector solo mostraba 20 pacientes
         sedesAPI.getAll({ activas: 'true' })
       ]);
 
@@ -118,11 +127,6 @@ const CitasCalendar = () => {
             notifyClick(citaData.canal === 'telefonico' ? 'R-05' : 'R-04');
           } catch { /* noop */ }
 
-          // Mostrar información del documento si se subió
-          if (response.data.data?.documento) {
-            console.log('Documento subido:', response.data.data.documento);
-          }
-
           loadCitas();
         }
       }
@@ -130,7 +134,8 @@ const CitasCalendar = () => {
       setSelectedCita(null);
     } catch (error) {
       console.error('Error al guardar cita:', error);
-      alert(error.response?.data?.error || 'Error al guardar la cita');
+      // `data.error` es un objeto { code, message }: mostrarlo directo daba "[object Object]".
+      alert(error.response?.data?.message || 'Error al guardar la cita');
     }
   };
 

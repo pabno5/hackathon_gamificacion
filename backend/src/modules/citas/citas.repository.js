@@ -1,4 +1,5 @@
-const { getPool, queryAs } = require('../../infrastructure/db');
+const { getPool, queryAs, withActor } = require('../../infrastructure/db');
+const { ConflictError } = require('../../shared/errors/AppError');
 
 const pool = getPool();
 
@@ -89,16 +90,41 @@ class CitasRepository {
         fecha_cita, hora_inicio, hora_fin, motivo, estado, canal, created_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::estado_cita, 'pendiente'), $10, $11)
       RETURNING id_cita`;
-    const { rows } = await queryAs(createdBy, sqlInsert, [
-      data.id_paciente, data.id_medico, data.id_sede,
-      data.id_especialidad || null,
-      data.fecha_cita, data.hora_inicio, data.hora_fin,
-      data.motivo || null,
-      data.estado || null,
-      data.canal,
-      createdBy,
-    ]);
-    return await this.findById(rows[0].id_cita);
+
+    // Verificar choque e insertar en la MISMA transacción, serializada por
+    // médico+fecha con un advisory lock. El chequeo previo del service es solo
+    // una vía rápida: dos peticiones simultáneas (recepción y callcenter) podían
+    // pasarlo a la vez y agendar al médico dos veces en el mismo horario.
+    const idCita = await withActor(createdBy, async (client) => {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1))',
+        [`cita:${data.id_medico}:${data.fecha_cita}`]
+      );
+      const choque = await client.query(
+        `SELECT 1 FROM citas
+          WHERE id_medico = $1
+            AND fecha_cita = $2
+            AND deleted_at IS NULL
+            AND estado NOT IN ('cancelada', 'no_asistio')
+            AND (hora_inicio, hora_fin) OVERLAPS ($3::time, $4::time)
+          LIMIT 1`,
+        [data.id_medico, data.fecha_cita, data.hora_inicio, data.hora_fin]
+      );
+      if (choque.rowCount > 0) {
+        throw new ConflictError('El médico ya tiene una cita en ese horario');
+      }
+      const { rows } = await client.query(sqlInsert, [
+        data.id_paciente, data.id_medico, data.id_sede,
+        data.id_especialidad || null,
+        data.fecha_cita, data.hora_inicio, data.hora_fin,
+        data.motivo || null,
+        data.estado || null,
+        data.canal,
+        createdBy,
+      ]);
+      return rows[0].id_cita;
+    });
+    return await this.findById(idCita);
   }
 
   async update(id, data, updatedBy) {

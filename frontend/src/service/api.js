@@ -32,6 +32,29 @@ async function attachToken(config) {
 apiV1.interceptors.request.use(attachToken, (e) => Promise.reject(e));
 apiLegacy.interceptors.request.use(attachToken, (e) => Promise.reject(e));
 
+// El backend responde los errores como { success:false, error:{ code, message, details } },
+// pero las pantallas leen `err.response.data.message`. Sin este puente el usuario
+// siempre veía el mensaje genérico ("No se pudo crear…") en vez del motivo real
+// (documento duplicado, choque de horario, campo inválido…).
+function normalizarError(error) {
+  const data = error?.response?.data;
+  if (data && typeof data === 'object' && !(data instanceof Blob)) {
+    const err = data.error;
+    if (!data.message && err && typeof err === 'object' && err.message) {
+      const detalle = Array.isArray(err.details) && err.details.length
+        ? `: ${err.details.map((d) => `${d.campo} — ${d.mensaje}`).join('; ')}`
+        : '';
+      data.message = `${err.message}${detalle}`;
+    } else if (!data.message && typeof err === 'string') {
+      data.message = err;
+    }
+  }
+  return Promise.reject(error);
+}
+
+apiV1.interceptors.response.use((r) => r, normalizarError);
+apiLegacy.interceptors.response.use((r) => r, normalizarError);
+
 // ============ AUTH ============
 export const authAPI = {
   login: (data) => apiV1.post('/auth/login', data),
@@ -50,7 +73,35 @@ function adaptCitaToFrontend(cita) {
   // Combinar `fecha_cita` + `hora_inicio` en un timestamp para el calendario
   const fecha = (cita.fecha_cita || '').slice(0, 10); // YYYY-MM-DD
   const horaIni = cita.hora_inicio?.slice(0, 5) || '00:00';
-  return { ...cita, fecha_cita: `${fecha}T${horaIni}:00` };
+  // `fecha_fin`: fin real de la cita (antes el calendario asumía siempre +1 h).
+  const horaFin = cita.hora_fin?.slice(0, 5) || null;
+  return {
+    ...cita,
+    fecha_cita: `${fecha}T${horaIni}:00`,
+    fecha_fin: horaFin ? `${fecha}T${horaFin}:00` : null,
+  };
+}
+
+// Aplica el adaptador a una respuesta con lista de citas.
+function adaptLista(res) {
+  return { ...res, data: { ...res.data, data: (res.data.data || []).map(adaptCitaToFrontend) } };
+}
+
+const LIMITE_PAGINA = 100; // máximo que acepta el backend
+const MAX_PAGINAS = 20;    // tope de seguridad: 2000 registros
+
+// Recorre todas las páginas de un listado paginado del backend.
+async function traerTodasLasPaginas(ruta, params = {}) {
+  let page = 1;
+  let primera = null;
+  const filas = [];
+  for (; page <= MAX_PAGINAS; page += 1) {
+    const res = await apiV1.get(ruta, { params: { ...params, page, limit: LIMITE_PAGINA } });
+    if (!primera) primera = res;
+    filas.push(...(res.data.data || []));
+    if (!res.data.meta?.hasNext) break;
+  }
+  return { ...primera, data: { ...primera.data, data: filas } };
 }
 
 function adaptCitaFromFrontend(data) {
@@ -83,10 +134,9 @@ export const citasAPI = {
     const res = await apiV1.post('/citas', payload);
     return { ...res, data: { ...res.data, data: adaptCitaToFrontend(res.data.data) } };
   },
-  getAll: async (params = {}) => {
-    const res = await apiV1.get('/citas', { params });
-    return { ...res, data: { ...res.data, data: (res.data.data || []).map(adaptCitaToFrontend) } };
-  },
+  getAll: async (params = {}) => adaptLista(await apiV1.get('/citas', { params })),
+  /** Todas las citas que cumplen el filtro (recorre la paginación). Para el calendario. */
+  getTodas: async (params = {}) => adaptLista(await traerTodasLasPaginas('/citas', params)),
   getById: async (id) => {
     const res = await apiV1.get(`/citas/${id}`);
     return { ...res, data: { ...res.data, data: adaptCitaToFrontend(res.data.data) } };
@@ -101,21 +151,25 @@ export const citasAPI = {
   cancelar: (id, motivo) =>
     apiV1.post(`/citas/${id}/cancelar`, { motivo_cancelacion: motivo }),
   disponibilidad: (params = {}) => apiV1.get('/citas/disponibilidad', { params }),
-  getByPaciente: (id_paciente) => apiV1.get('/citas', { params: { id_paciente } }),
-  getByMedico: (id_medico) => apiV1.get('/citas', { params: { id_medico } }),
-  getByEstado: (estado) => apiV1.get('/citas', { params: { estado } }),
-  getByFechas: (from, to) => apiV1.get('/citas', { params: { from, to } }),
+  // Todas pasan por el adaptador: sin él `fecha_cita` llega como fecha sin hora
+  // y las pantallas mostraban la cita a medianoche (o el día anterior).
+  getByPaciente: async (id_paciente) => adaptLista(await apiV1.get('/citas', { params: { id_paciente } })),
+  getByMedico: async (id_medico) => adaptLista(await apiV1.get('/citas', { params: { id_medico } })),
+  getByEstado: async (estado) => adaptLista(await apiV1.get('/citas', { params: { estado } })),
+  getByFechas: async (from, to) => adaptLista(await apiV1.get('/citas', { params: { from, to } })),
 };
 
 // ============ PACIENTES (v1) ============
 export const personasAPI = {
   create: (data) => apiV1.post('/pacientes', data),
   getAll: (params = {}) => apiV1.get('/pacientes', { params }),
+  /** Todos los pacientes (recorre la paginación). Para selectores. */
+  getTodos: (params = {}) => traerTodasLasPaginas('/pacientes', params),
   getById: (id) => apiV1.get(`/pacientes/${id}`),
   update: (id, data) => apiV1.put(`/pacientes/${id}`, data),
   delete: (id) => apiV1.delete(`/pacientes/${id}`),
   getByDocumento: (numero_documento) =>
-    apiV1.get(`/pacientes/documento/${numero_documento}`),
+    apiV1.get(`/pacientes/documento/${encodeURIComponent(String(numero_documento).trim())}`),
 };
 
 // ============ MÉDICOS (v1) ============

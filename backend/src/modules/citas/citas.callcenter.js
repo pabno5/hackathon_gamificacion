@@ -5,6 +5,7 @@ const asyncHandler = require('../../shared/utils/asyncHandler');
 const ApiResponse = require('../../shared/response/ApiResponse');
 const validate = require('../../shared/middleware/validate.middleware');
 const { requireApiKey } = require('../../shared/middleware/apiKey.middleware');
+const { ValidationError } = require('../../shared/errors/AppError');
 
 const pool = getPool();
 
@@ -78,6 +79,10 @@ function buildCallcenterRouter(citasService) {
         const cfg = await pool.query('SELECT duracion_slot_min FROM configuracion_agenda WHERE id = 1');
         const dur = cfg.rows[0]?.duracion_slot_min || 30;
         horaFin = sumarMin(datos.hora_inicio, dur);
+      }
+      // 'HH:MM' y 'HH:MM:SS' se comparan bien como texto recortado a 5 caracteres.
+      if (String(horaFin).slice(0, 5) <= String(datos.hora_inicio).slice(0, 5)) {
+        throw new ValidationError('hora_fin debe ser mayor que hora_inicio');
       }
 
       const idPaciente = await buscarOCrearPaciente(datos.paciente);

@@ -12,8 +12,9 @@ export function ChatBot() {
 
   // 🔸 Función para enviar mensaje al backend
   const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMessage = { from: "user", text: input };
+    const consulta = input.trim();
+    if (!consulta || loading) return; // sin envíos dobles mientras responde
+    const userMessage = { from: "user", text: consulta };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
@@ -23,8 +24,14 @@ export function ChatBot() {
       const res = await fetch(`${CHATBOT}/buscar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: input })
+        body: JSON.stringify({ query: consulta })
       });
+
+      if (res.status === 429) {
+        setMessages((prev) => [...prev, { from: "bot", text: "Estás enviando muchas consultas seguidas. Espera un momento e intenta de nuevo." }]);
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
       const botMessage = {
@@ -105,6 +112,7 @@ export function ChatBot() {
                 <input
                   type="text"
                   placeholder="Escribe tu mensaje..."
+                  maxLength={500}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}

@@ -78,6 +78,11 @@ class EmpleadosService {
   }
 
   async desactivar(idEmpleado, actorId) {
+    // Un admin no puede desactivarse a sí mismo: si es el único, nadie podría
+    // volver a entrar al panel para reactivarlo.
+    if (String(idEmpleado) === String(actorId)) {
+      throw new ValidationError('No puedes desactivar tu propia cuenta');
+    }
     const ok = await this.repo.setActivo(idEmpleado, false, actorId);
     if (!ok) throw new NotFoundError('Empleado');
     this.events?.emit('empleado.desactivado', { idEmpleado });

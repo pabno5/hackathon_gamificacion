@@ -5,6 +5,7 @@ import { Label } from "../../ui/label";
 import { Button } from "../../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { agendaAPI, medicosAPI } from "../../../service/api";
+import { hoyLocal } from "../../../lib/fechas";
 
 /**
  * Configuración de turnos (BE-02):
@@ -23,7 +24,7 @@ export default function TurnosAdmin() {
   const [nuevoBloqueo, setNuevoBloqueo] = useState({ fecha: "", hora_inicio: "", hora_fin: "", motivo: "" });
 
   // Vista de turnos del día (los "turnos registrados" del médico)
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyLocal(); // fecha local: toISOString() da UTC y de noche ya es "mañana"
   const [fechaTurnos, setFechaTurnos] = useState(hoy);
   const [slotsLibres, setSlotsLibres] = useState<string[] | null>(null);
   const [cargandoTurnos, setCargandoTurnos] = useState(false);

@@ -9,7 +9,9 @@ class AuthController {
 
   login = asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
-    if (!email || !password) throw new ValidationError('email y password son requeridos');
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+      throw new ValidationError('email y password son requeridos');
+    }
     const result = await this.service.login(email, password);
     res.json(ApiResponse.success(result));
   });
@@ -45,7 +47,7 @@ class AuthController {
   /** Solicitud de recuperación de contraseña. */
   recuperarPassword = asyncHandler(async (req, res) => {
     const { email, redirectTo } = req.body || {};
-    if (!email) throw new ValidationError('email es requerido');
+    if (typeof email !== 'string' || !email.trim()) throw new ValidationError('email es requerido');
     await this.service.solicitarReset(email, redirectTo);
     res.json(ApiResponse.success({ enviado: true }));
   });

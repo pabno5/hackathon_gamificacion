@@ -58,7 +58,8 @@ class PacientesRepository {
     ];
 
     if (search) {
-      params.push(`%${search}%`);
+      // Escapar comodines de LIKE: buscar "%" o "_" no debe coincidir con todo.
+      params.push(`%${String(search).replace(/[\\%_]/g, '\\$&')}%`);
       const idx = params.length;
       where.push(
         `(p.nombres ILIKE $${idx} OR p.apellidos ILIKE $${idx} OR p.numero_documento ILIKE $${idx})`

@@ -39,12 +39,8 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
 
   useEffect(() => {
     if (cita) {
-      // DEBUG: Ver datos de la cita
-      console.log('📋 Datos de la cita:', cita);
-      console.log('📄 cita.documento:', cita.documento);
-      console.log('📍 cita.ubicacion:', cita.ubicacion);
-      console.log('🔗 cita.id_documento:', cita.id_documento);
-      
+      // (Sin console.log de la cita: contiene datos personales del paciente y
+      // quedaban visibles en la consola del navegador.)
       const dt = cita.fecha_cita ? new Date(cita.fecha_cita) : null;
       setFormData({
         id_paciente: cita.id_paciente || '',
@@ -63,15 +59,16 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
       
       // Si la cita tiene un documento asociado, mostrarlo
       // Primero buscar en cita.documento, luego en cita.ubicacion
-      if (cita.documento && cita.documento.enlace) {
-        console.log('✅ Encontrado documento en cita.documento.enlace');
+      // Solo enlaces http(s): un valor "javascript:..." guardado en BD se
+      // ejecutaría al hacer clic en "Abrir documento".
+      const esEnlaceSeguro = (u) => /^https?:\/\//i.test(String(u || ''));
+      if (cita.documento && esEnlaceSeguro(cita.documento.enlace)) {
         setFilePreview({
           name: cita.documento.tipo_documento || 'Documento adjunto',
           url: cita.documento.enlace,
           existing: true,
         });
-      } else if (cita.ubicacion) {
-        console.log('✅ Encontrado documento en cita.ubicacion');
+      } else if (esEnlaceSeguro(cita.ubicacion)) {
         // Si no hay objeto documento pero hay ubicacion, usar ese campo
         setFilePreview({
           name: 'Documento adjunto',
@@ -79,7 +76,6 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
           existing: true,
         });
       } else {
-        console.log('❌ No se encontró documento en la cita');
         setFilePreview(null);
       }
     } else {
@@ -505,9 +501,6 @@ const CitaModal = ({ cita, medicos, pacientes, sedes = [], onSave, onDelete, onC
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="file-link"
-                          onClick={(e) => {
-                            console.log('Abriendo documento:', filePreview.url);
-                          }}
                         >
                           📥 Abrir Documento
                         </a>

@@ -50,8 +50,22 @@ export function AppointmentChatSection() {
       const res = await fetch(`${CHATBOT}/buscar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text }),
+        body: JSON.stringify({ query: text.trim().slice(0, 500) }),
       });
+
+      if (res.status === 429) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: prev.length + 1,
+            text: "Estás enviando muchas consultas seguidas. Espera un momento e intenta de nuevo.",
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
 

@@ -1,7 +1,10 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+import hmac
 import threading
+import time
+from collections import defaultdict, deque
 import numpy as np
 import faiss
 import requests
@@ -9,9 +12,9 @@ from groq import Groq
 import pandas as pd
 import sqlite3
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, Header, HTTPException
+from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 import uuid
 from pypdf import PdfReader
@@ -38,7 +41,17 @@ UMBRAL_RELEVANCIA = 1.0
 FRAGMENTOS_EN_CONTEXTO = 4
 INTERNAL_SECRET = os.environ.get("CHATBOT_INTERNAL_SECRET")
 
-groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+# Límites del endpoint público /buscar. Cada consulta gasta cuota del LLM, así
+# que sin tope cualquiera podía agotar la cuota (o inflar el costo) con un script.
+MAX_QUERY_CHARS = 500
+MAX_K = 10
+RATE_LIMIT_MAX = int(os.environ.get("CHATBOT_RATE_LIMIT_MAX", "20"))       # consultas…
+RATE_LIMIT_WINDOW = int(os.environ.get("CHATBOT_RATE_LIMIT_WINDOW", "60"))  # …por ventana (s) e IP
+MAX_PDF_BYTES = 15 * 1024 * 1024
+
+# El cliente de Groq solo se crea si se va a usar: con LLM_PROVIDER=ollama y sin
+# GROQ_API_KEY el servicio no arrancaba.
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY")) if LLM_PROVIDER != "ollama" else None
 embed_model = SentenceTransformer(EMBED_MODEL_NAME)
 
 print(f"Proveedor de LLM: {LLM_PROVIDER} ({GROQ_MODEL if LLM_PROVIDER == 'groq' else OLLAMA_MODEL})")
@@ -206,11 +219,15 @@ def listar_documentos():
 def agregar_documento(path, archivo):
     """Procesa un PDF nuevo y lo incorpora al índice en caliente (reemplaza si ya existía)."""
     global data, index
+    # Resumir con el LLM tarda minutos: se hace FUERA del lock para no bloquear
+    # las búsquedas ni otras altas mientras tanto.
+    nuevas_filas = _procesar_pdf(path, archivo)
     with _lock:
-        nuevas_filas = _procesar_pdf(path, archivo)
-        data = pd.concat([data[data["archivo"] != archivo], nuevas_filas], ignore_index=True)
-        _guardar_db(data)
-        index = _construir_indice(data)
+        nuevo_data = pd.concat([data[data["archivo"] != archivo], nuevas_filas], ignore_index=True)
+        nuevo_index = _construir_indice(nuevo_data)
+        _guardar_db(nuevo_data)
+        # Se reemplazan juntos: una búsqueda nunca ve un índice que no corresponde a `data`.
+        data, index = nuevo_data, nuevo_index
         return len(nuevas_filas)
 
 
@@ -219,9 +236,10 @@ def eliminar_documento(archivo):
     with _lock:
         if archivo not in set(data["archivo"]):
             return False
-        data = data[data["archivo"] != archivo].reset_index(drop=True)
-        _guardar_db(data)
-        index = _construir_indice(data)
+        nuevo_data = data[data["archivo"] != archivo].reset_index(drop=True)
+        nuevo_index = _construir_indice(nuevo_data)
+        _guardar_db(nuevo_data)
+        data, index = nuevo_data, nuevo_index
         ruta = os.path.join(DOCS_FOLDER, archivo)
         if os.path.exists(ruta):
             os.remove(ruta)
@@ -236,6 +254,12 @@ _inicializar_estado()
 # ==============================
 
 def buscar_y_responder(query, k=7):
+    # Instantánea coherente de (data, index): un alta/baja de documento en
+    # paralelo los reemplaza a la vez, y leerlos por separado podía cruzar un
+    # índice viejo con datos nuevos (IndexError → error 500).
+    with _lock:
+        data, index = globals()["data"], globals()["index"]
+
     if len(data) == 0:
         return {
             "respuesta": "Aún no hay documentos cargados. Por favor comuníquese directamente con Clínica Cárdenas Visión.",
@@ -249,8 +273,10 @@ def buscar_y_responder(query, k=7):
 
     resultados_relevantes = []
     for i, dist in enumerate(distances[0]):
+        idx = indices[0][i]
+        if idx < 0 or idx >= len(data):
+            continue  # FAISS devuelve -1 cuando no hay más vecinos
         if dist < UMBRAL_RELEVANCIA:
-            idx = indices[0][i]
             resultados_relevantes.append({
                 'resumen': data.iloc[idx]['resumen'],
                 'fragmento': data.iloc[idx]['fragmento'],
@@ -326,25 +352,73 @@ _cors_origins = (
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_credentials=True,
+    # El chatbot público no usa cookies ni sesión: sin credenciales.
+    allow_credentials=False,
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )
 
 
 def _verificar_secreto(x_internal_secret: str = Header(default=None)):
-    if not INTERNAL_SECRET or x_internal_secret != INTERNAL_SECRET:
+    # Comparación en tiempo constante; sin secreto configurado se rechaza todo.
+    if not INTERNAL_SECRET or not x_internal_secret or not hmac.compare_digest(
+        x_internal_secret.encode("utf-8"), INTERNAL_SECRET.encode("utf-8")
+    ):
         raise HTTPException(status_code=401, detail="No autorizado")
 
 
+# ---- Límite de consultas por IP (ventana deslizante, en memoria) ----
+# Suficiente para una sola instancia.
+# Detrás de un proxy (Railway) todas las peticiones llegan desde la IP del proxy:
+# poner CHATBOT_TRUST_PROXY=true para leer la IP real de X-Forwarded-For. Sin
+# proxy NO se confía en esa cabecera, porque el cliente puede inventarla y
+# saltarse el límite.
+TRUST_PROXY = os.environ.get("CHATBOT_TRUST_PROXY", "false").lower() == "true"
+_rate_lock = threading.Lock()
+_rate_hits = defaultdict(deque)
+
+
+def _ip_cliente(request: Request) -> str:
+    if TRUST_PROXY:
+        reenviada = request.headers.get("x-forwarded-for")
+        if reenviada:
+            # El último valor lo añade el proxy más cercano; los anteriores los
+            # puede haber escrito el propio cliente.
+            return reenviada.split(",")[-1].strip()
+    return request.client.host if request.client else "desconocida"
+
+
+def _verificar_limite(request: Request):
+    ahora = time.monotonic()
+    ip = _ip_cliente(request)
+    with _rate_lock:
+        hits = _rate_hits[ip]
+        while hits and ahora - hits[0] > RATE_LIMIT_WINDOW:
+            hits.popleft()
+        if len(hits) >= RATE_LIMIT_MAX:
+            raise HTTPException(
+                status_code=429,
+                detail="Demasiadas consultas. Espera un momento e intenta de nuevo.",
+            )
+        hits.append(ahora)
+        # Evitar que el mapa crezca sin límite con IPs que ya no consultan.
+        if len(_rate_hits) > 10_000:
+            for clave in [c for c, h in _rate_hits.items() if not h or ahora - h[-1] > RATE_LIMIT_WINDOW]:
+                del _rate_hits[clave]
+
+
 class BusquedaRequest(BaseModel):
-    query: str
-    k: int = 5
+    query: str = Field(min_length=1, max_length=MAX_QUERY_CHARS)
+    k: int = Field(default=5, ge=1, le=MAX_K)
 
 
 @app.post("/buscar")
-def buscar(request: BusquedaRequest):
-    return buscar_y_responder(request.query, k=request.k)
+def buscar(body: BusquedaRequest, request: Request):
+    _verificar_limite(request)
+    consulta = body.query.strip()
+    if not consulta:
+        raise HTTPException(status_code=422, detail="La consulta está vacía")
+    return buscar_y_responder(consulta, k=body.k)
 
 
 @app.get("/")
@@ -373,7 +447,13 @@ async def admin_subir_documento(file: UploadFile = File(...), x_internal_secret:
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
 
     destino = os.path.join(DOCS_FOLDER, nombre)
-    contenido = await file.read()
+    # Leer con tope: no cargar en memoria un archivo de tamaño arbitrario.
+    contenido = await file.read(MAX_PDF_BYTES + 1)
+    if len(contenido) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="El PDF supera el tamaño permitido (15 MB)")
+    # La extensión la elige quien sube el archivo; se confirma la firma real.
+    if not contenido.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="El archivo no es un PDF válido")
     with open(destino, "wb") as f:
         f.write(contenido)
 
@@ -382,7 +462,9 @@ async def admin_subir_documento(file: UploadFile = File(...), x_internal_secret:
     except Exception as e:
         if os.path.exists(destino):
             os.remove(destino)
-        raise HTTPException(status_code=500, detail=f"Error al procesar el PDF: {e}")
+        # El detalle técnico va al log, no a la respuesta.
+        print(f"[ERROR subir_documento] {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Error al procesar el PDF")
 
     return {"archivo": nombre, "fragmentos": fragmentos}
 

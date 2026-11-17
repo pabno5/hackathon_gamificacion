@@ -21,8 +21,10 @@ async function requireAuth(req, _res, next) {
   try {
     let token = null;
     const header = req.headers.authorization || '';
-    if (header.startsWith('Bearer ')) token = header.substring(7);
-    else if (req.cookies && req.cookies.authToken) token = req.cookies.authToken;
+    // Solo header Authorization. No se acepta el token por cookie: el navegador
+    // la enviaría sola en peticiones de otros sitios (CSRF) y el frontend nunca
+    // la usó — guarda el JWT en el cliente de Supabase.
+    if (header.startsWith('Bearer ')) token = header.substring(7).trim();
 
     if (!token) throw new UnauthorizedError('No se proporcionó token');
 

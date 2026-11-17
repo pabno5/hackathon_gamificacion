@@ -1,8 +1,9 @@
 const { getPool, queryAs } = require('../../infrastructure/db');
-const { getSupabaseClient } = require('../../infrastructure/supabase');
+const { createUserAuthClient } = require('../../infrastructure/supabase');
 const {
   UnauthorizedError, NotFoundError, ForbiddenError,
 } = require('../../shared/errors/AppError');
+const { esUrlPermitida } = require('../../shared/utils/origins');
 
 const pool = getPool();
 
@@ -13,11 +14,24 @@ class AuthService {
    * este endpoint queda como conveniencia y para validar que el usuario sea empleado.
    */
   async login(email, password) {
-    const supabase = getSupabaseClient();
+    // Cliente desechable: el login no debe contaminar el singleton de service_role.
+    const supabase = createUserAuthClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new UnauthorizedError(error.message);
+    // Mensaje genérico: no distinguir "correo no existe" de "contraseña incorrecta".
+    if (error || !data?.user) throw new UnauthorizedError('Credenciales inválidas');
 
-    const perfil = await this.perfilPorAuthUid(data.user.id);
+    let perfil;
+    try {
+      perfil = await this.perfilPorAuthUid(data.user.id);
+    } catch (e) {
+      if (e instanceof NotFoundError) {
+        throw new ForbiddenError('Usuario autenticado sin empleado vinculado');
+      }
+      throw e;
+    }
+    // Un empleado desactivado no recibe sesión (requireAuth también lo bloquea).
+    if (!perfil.activo) throw new ForbiddenError('Empleado desactivado');
+
     return { session: data.session, user: data.user, perfil };
   }
 
@@ -76,11 +90,26 @@ class AuthService {
     return { id_persona: rows[0].id_persona };
   }
 
-  /** Solicita correo de recuperación de contraseña (Supabase Auth). */
+  /**
+   * Solicita correo de recuperación de contraseña (Supabase Auth).
+   *
+   * - Nunca revela si el correo existe: cualquier fallo se registra en el log
+   *   del servidor y la respuesta es siempre la misma.
+   * - `redirectTo` llega del cliente: solo se acepta si apunta a un origen del
+   *   frontend autorizado. Si no, se descarta y Supabase usa su Site URL. Así el
+   *   enlace con el token de recuperación no puede enviarse a un sitio ajeno.
+   */
   async solicitarReset(email, redirectTo) {
-    const supabase = getSupabaseClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    if (error) throw new UnauthorizedError(error.message);
+    const destino = esUrlPermitida(redirectTo) ? redirectTo : undefined;
+    try {
+      const supabase = createUserAuthClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email, destino ? { redirectTo: destino } : undefined
+      );
+      if (error) console.warn('[auth] recuperación de contraseña falló:', error.message);
+    } catch (e) {
+      console.warn('[auth] recuperación de contraseña falló:', e.message);
+    }
   }
 }
 

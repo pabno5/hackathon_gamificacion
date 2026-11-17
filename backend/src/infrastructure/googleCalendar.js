@@ -58,8 +58,15 @@ function isEnabled() {
 
 function combinarFechaHora(fecha, hora) {
   // fecha: 'YYYY-MM-DD', hora: 'HH:MM' o 'HH:MM:SS'
-  const horaPad = hora.length === 5 ? `${hora}:00` : hora;
-  return `${fecha}T${horaPad}`;
+  // Defensa: si la fecha llega como Date (driver sin el parser de DATE),
+  // se toma su parte de calendario en vez de concatenar el texto del Date,
+  // que producía un dateTime inválido y el evento nunca se creaba.
+  const fechaStr = fecha instanceof Date
+    ? `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`
+    : String(fecha).slice(0, 10);
+  const horaStr = String(hora);
+  const horaPad = horaStr.length === 5 ? `${horaStr}:00` : horaStr;
+  return `${fechaStr}T${horaPad}`;
 }
 
 /**
@@ -150,24 +157,56 @@ async function eliminarEvento(calendarId, eventId) {
   }
 }
 
+/**
+ * Lista TODOS los eventos del rango (recorre las páginas de la API).
+ *
+ * LANZA si Calendar no está disponible o la API falla. No devuelve lista vacía
+ * ante un error: el cron interpreta "evento ausente" como "cita cancelada", así
+ * que una lista vacía por un fallo de red cancelaría citas reales.
+ */
 async function listarEventos(calendarId, { from, to } = {}) {
-  if (!isEnabled() || !calendarId) return [];
-  try {
-    const timeMin = from ? new Date(from).toISOString() : new Date().toISOString();
-    const timeMax = to
-      ? new Date(to).toISOString()
-      : new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+  if (!isEnabled()) throw new Error('Google Calendar no está configurado');
+  if (!calendarId) throw new Error('calendarId requerido');
+
+  const timeMin = from ? new Date(from).toISOString() : new Date().toISOString();
+  const timeMax = to
+    ? new Date(to).toISOString()
+    : new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+
+  const items = [];
+  let pageToken;
+  do {
     const { data } = await client.events.list({
       calendarId,
       timeMin,
       timeMax,
       singleEvents: true,
       orderBy: 'startTime',
+      maxResults: 2500,
+      pageToken,
     });
-    return data.items || [];
+    items.push(...(data.items || []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return items;
+}
+
+/**
+ * ¿El evento sigue existiendo en el calendario?
+ * - true: existe y no está cancelado.
+ * - false: Google responde 404/410 o el evento está en estado `cancelled`.
+ * LANZA ante cualquier otro error (red, permisos): quien llama no debe asumir
+ * que el evento fue borrado.
+ */
+async function eventoExiste(calendarId, eventId) {
+  if (!isEnabled()) throw new Error('Google Calendar no está configurado');
+  try {
+    const { data } = await client.events.get({ calendarId, eventId });
+    return data.status !== 'cancelled';
   } catch (e) {
-    console.error('[Calendar] listarEventos falló:', e.message);
-    return [];
+    const status = e.code || e.response?.status;
+    if (status === 404 || status === 410) return false;
+    throw e;
   }
 }
 
@@ -177,4 +216,5 @@ module.exports = {
   actualizarEvento,
   eliminarEvento,
   listarEventos,
+  eventoExiste,
 };
